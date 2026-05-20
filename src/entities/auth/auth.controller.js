@@ -2,7 +2,7 @@ import { StatusCodes } from 'http-status-codes';
 import { generateResponse } from '../../lib/responseFormate.js';
 import sendResponse from '../../lib/sendResponse.js';
 import {
-  loginUserService,
+  login,
   refreshAccessTokenService,
   registerUserService,
   resendOtpCodeInEmail,
@@ -20,28 +20,36 @@ export const registerUser = async (req, res) => {
   });
 };
 
-export const loginUser = async (req, res, next) => {
-  const { email, password } = req.body;
-
+export const loginUser = async (req, res) => {
   try {
-    const data = await loginUserService({ email, password });
-    generateResponse(res, 200, true, 'Login successful', data);
-  } catch (error) {
-    if (error.message === 'Email and password are required') {
-      generateResponse(
-        res,
-        400,
-        false,
-        'Email and password are required',
-        null
-      );
-    } else if (error.message === 'User not found') {
-      generateResponse(res, 404, false, 'User not found', null);
-    } else if (error.message === 'Invalid password') {
-      generateResponse(res, 400, false, 'Invalid password', null);
-    } else {
-      next(error);
+    const result = await login(req.body);
+
+    if (result?.message === 'Please verify your email' && result.accessToken) {
+      return res.status(200).json({
+        success: true,
+        message: result.message,
+        data: {
+          accessToken: result.accessToken
+        }
+      });
     }
+
+    const { accessToken, user } = result;
+
+    return res.status(200).json({
+      success: true,
+      message: 'User logged in successfully',
+      data: {
+        accessToken,
+        user
+      }
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      code: 400,
+      message: error.message
+    });
   }
 };
 
