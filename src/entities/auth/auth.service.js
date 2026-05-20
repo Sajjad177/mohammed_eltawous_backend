@@ -6,11 +6,11 @@ import {
   refreshTokenExpiresIn,
   refreshTokenSecrete
 } from '../../core/config/config.js';
-import logger from '../../core/config/logger.js';
-import verificationCodeTemplate from '../../lib/emailTemplates.js';
+// import verificationCodeTemplate from '../../lib/emailTemplates.js';
 import sendEmail from '../../lib/sendEmail.js';
 import { createToken } from '../../utility/tokenGenerate.js';
 import User from './auth.model.js';
+import { verificationCodeTemplate } from '../../lib/verificationCodeTemplate.js';
 
 export const registerUserService = async (payload) => {
   const email = payload.email.toLowerCase();
@@ -177,4 +177,33 @@ export const verifyUserEmail = async (payload, email) => {
   }
 
   return response;
+};
+
+export const resendOtpCodeInEmail = async ({ email }) => {
+  const existingUser = await User.findOne({ email });
+
+  if (!existingUser) throw new Error('User not found');
+  if (existingUser.isVerified) {
+    throw new Error('User already verified');
+  }
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const hashedOtp = await bcrypt.hash(otp, 10);
+  const otpExpires = new Date(Date.now() + 5 * 60 * 1000);
+
+  const result = await User.findOneAndUpdate(
+    { email },
+    {
+      otp: hashedOtp,
+      otpExpires
+    },
+    { new: true }
+  ).select('name email role');
+
+  await sendEmail({
+    to: existingUser.email,
+    subject: 'Verify your email',
+    html: verificationCodeTemplate(otp)
+  });
+  return result;
 };

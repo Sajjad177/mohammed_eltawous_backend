@@ -5,6 +5,7 @@ import {
   loginUserService,
   refreshAccessTokenService,
   registerUserService,
+  resendOtpCodeInEmail,
   verifyUserEmail
 } from './auth.service.js';
 
@@ -79,5 +80,19 @@ export const verifyEmail = async (req, res) => {
       message: error.message,
       data: null
     });
+  }
+};
+
+export const resendOtpCode = async (req, res) => {
+  try {
+    const result = await resendOtpCodeInEmail(req.user);
+
+    return res.status(200).json({
+      success: true,
+      message: 'OTP resent successfully',
+      data: result
+    });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message });
   }
 };

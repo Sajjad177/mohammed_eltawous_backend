@@ -3,6 +3,7 @@ import {
   loginUser,
   refreshAccessToken,
   registerUser,
+  resendOtpCode,
   verifyEmail
 } from './auth.controller.js';
 import auth from '../../core/middlewares/authMiddleware.js';
@@ -17,6 +18,12 @@ router.post(
   '/verify-email',
   auth(USER_ROLE.user, USER_ROLE.admin),
   verifyEmail
+);
+
+router.post(
+  '/resend-otp',
+  auth(USER_ROLE.user, USER_ROLE.admin),
+  resendOtpCode
 );
 
 const authRoutes = router;
