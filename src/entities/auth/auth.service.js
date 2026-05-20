@@ -1,23 +1,19 @@
-import User from './auth.model.js';
+import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import {
-  refreshTokenSecrete,
-  emailExpires,
-  jwtSecret,
   jwtExpire,
-  refreshTokenExpiresIn
+  jwtSecret,
+  refreshTokenExpiresIn,
+  refreshTokenSecrete
 } from '../../core/config/config.js';
-import sendEmail from '../../lib/sendEmail.js';
+import logger from '../../core/config/logger.js';
 import verificationCodeTemplate from '../../lib/emailTemplates.js';
+import sendEmail from '../../lib/sendEmail.js';
 import { createToken } from '../../utility/tokenGenerate.js';
-import bcrypt from 'bcrypt';
+import User from './auth.model.js';
 
 export const registerUserService = async (payload) => {
   const email = payload.email.toLowerCase();
-  // const existingUser = await User.findOne({
-  //   email: { $regex: `^${email}$`, $options: "i" },
-  // });
-
   const existingUser = await User.findOne({ email });
 
   if (existingUser) {
@@ -132,96 +128,53 @@ export const refreshAccessTokenService = async (refreshToken) => {
   };
 };
 
-export const forgetPasswordService = async (email) => {
-  if (!email) throw new Error('Email is required');
+export const verifyUserEmail = async (payload, email) => {
+  const { otp } = payload;
+  if (!otp) throw new Error('OTP is required');
 
-  const user = await User.findOne({ email });
-  if (!user) throw new Error('Invalid email');
+  const existingUser = await User.findOne({ email });
+  if (!existingUser) throw new Error('User not found');
 
-  const otp = Math.floor(100000 + Math.random() * 900000);
-  const otpExpires = new Date(Date.now() + emailExpires);
-
-  user.otp = otp;
-  user.otpExpires = otpExpires;
-  user.otpVerified = false;
-  user.resetExpires = null;
-
-  await user.save({ validateBeforeSave: false });
-
-  await sendEmail({
-    to: email,
-    subject: 'Password Reset OTP',
-    html: verificationCodeTemplate(otp)
-  });
-
-  return;
-};
-
-export const verifyCodeService = async ({ email, otp }) => {
-  if (!email || !otp) throw new Error('Email and otp are required');
-
-  const user = await User.findOne({ email });
-  if (!user) throw new Error('Invalid email');
-
-  if (!user.otp || !user.otpExpires) throw new Error('Otp not found');
-
-  if (
-    parseInt(user.otp, 10) !== parseInt(otp, 10) ||
-    Date.now() > user.otpExpires.getTime()
-  ) {
-    throw new Error('Invalid or expired otp');
+  if (!existingUser.otp || !existingUser.otpExpires) {
+    throw new Error('OTP not requested or expired');
   }
 
-  user.otp = null;
-  user.otpExpires = null;
-  user.otpVerified = true;
-  user.resetExpires = new Date(Date.now() + 15 * 60 * 1000);
-
-  await user.save({ validateBeforeSave: false });
-
-  return;
-};
-
-export const resetPasswordService = async ({ email, newPassword }) => {
-  if (!email || !newPassword)
-    throw new Error('Email and new password are required');
-
-  const user = await User.findOne({ email });
-  if (!user) throw new Error('Invalid email');
-
-  if (!user.otpVerified || !user.resetExpires) {
-    throw new Error('otp not cleared');
+  if (existingUser.otpExpires < new Date()) {
+    throw new Error('OTP has expired');
   }
 
-  if (Date.now() > user.resetExpires.getTime()) {
-    throw new Error('Reset session expired');
+  const isOtpMatched = await bcrypt.compare(otp.toString(), existingUser.otp);
+  if (!isOtpMatched) throw new Error('Invalid OTP');
+
+  const result = await User.findOneAndUpdate(
+    { email },
+    {
+      isVerified: true,
+      $unset: { otp: '', otpExpires: '' }
+    },
+    { new: true }
+  ).select(
+    '-password -otp -otpExpires -resetPasswordOtp -resetPasswordOtpExpires'
+  );
+
+  const response = {
+    success: true,
+    message: 'Email verified successfully',
+    data: result
+  };
+
+  // Add token only if 2FA is enabled
+  if (result.toFactorAuth) {
+    const JwtToken = {
+      userId: result._id,
+      email: result.email,
+      userType: result.userType
+    };
+
+    const accessToken = createToken(JwtToken, jwtSecret, jwtExpire);
+
+    response.accessToken = accessToken;
   }
 
-  user.password = newPassword;
-  user.otpVerified = false;
-  user.resetExpires = null;
-
-  await user.save();
-
-  return;
-};
-
-export const changePasswordService = async ({
-  userId,
-  oldPassword,
-  newPassword
-}) => {
-  if (!userId || !oldPassword || !newPassword)
-    throw new Error('User id, old password and new password are required');
-
-  const user = await User.findById(userId);
-  if (!user) throw new Error('User not found');
-
-  const isMatch = await user.comparePassword(userId, oldPassword);
-  if (!isMatch) throw new Error('Invalid old password');
-
-  user.password = newPassword;
-  await user.save();
-
-  return;
+  return response;
 };

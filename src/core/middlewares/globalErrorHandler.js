@@ -6,7 +6,7 @@ export const globalErrorHandler = (err, req, res, next) => {
   sendResponse(res, {
     statusCode,
     message: err.message || 'Something went wrong',
-    errors: err.errors,
+    errors: err.errors
   });
 
   next();

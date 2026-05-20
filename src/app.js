@@ -1,22 +1,22 @@
 // import csurf from 'csurf';
 // app.use(csurf({ cookie: true }));
 
-import express from 'express';
-import helmet from 'helmet';
-import cors from 'cors';
-import xssClean from 'xss-clean';
-import mongoSanitize from 'express-mongo-sanitize';
-import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
+import cors from 'cors';
+import express from 'express';
+import mongoSanitize from 'express-mongo-sanitize';
+import helmet from 'helmet';
+import morgan from 'morgan';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import xssClean from 'xss-clean';
 
 import logger from './core/config/logger.js';
 // import errorHandler from './core/middlewares/errorMiddleware.js';
-import notFound from './core/middlewares/notFound.js';
-import { globalLimiter } from './lib/limit.js';
 import appRouter from './core/app/appRouter.js';
 import { globalErrorHandler } from './core/middlewares/globalErrorHandler.js';
+import notFound from './core/middlewares/notFound.js';
+import { globalLimiter } from './lib/limit.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -76,6 +76,22 @@ app.use(express.static(publicPath));
 
 // Set up API routes
 app.use('/api/v1', appRouter);
+
+// Dev-only debug endpoints: use these to verify console.log output in your terminal.
+// Remove or protect in production.
+app.post('/__debug/echo', (req, res) => {
+  try {
+    console.log('DEBUG POST /__debug/echo body:', JSON.stringify(req.body));
+  } catch (e) {
+    console.log('DEBUG POST /__debug/echo body (raw):', req.body);
+  }
+  res.json({ success: true, body: req.body });
+});
+
+app.get('/__debug/echo', (req, res) => {
+  console.log('DEBUG GET /__debug/echo query:', req.query);
+  res.json({ success: true, query: req.query });
+});
 
 // Set up 404 error middleware
 app.use(notFound);
