@@ -77,29 +77,91 @@ export const registerUserService = async (payload) => {
   };
 };
 
-export const loginUserService = async ({ email, password }) => {
-  if (!email || !password) throw new Error('Email and password are required');
-
+export const login = async (payload) => {
+  const email = payload.email.trim().toLowerCase();
   const user = await User.findOne({ email }).select(
-    '_id firstName lastName email role profileImage'
+    '+password +toFactorAuth +otp +otpExpires'
   );
 
+  // console.log(user);
+
   if (!user) throw new Error('User not found');
+  if (!user.isActive)
+    throw new Error('Your account is suspended. Please contact support.');
+  if (user.isDelete === true)
+    throw new Error('Your account is deleted. Please contact support.');
 
-  const isMatch = await user.comparePassword(user._id, password);
-  if (!isMatch) throw new Error('Invalid password');
+  if (!user.isVerified)
+    throw new Error('Please verify your email address first');
 
-  const payload = { _id: user._id, role: user.role };
+  if (user.isDeactivate) {
+    //! there are some issues need to be fixed.
+    const now = new Date();
+    if (now > user.deactivateEndDate) {
+      user.isActive = false;
+      user.isDeactivate = true;
+      await user.save();
+      throw new Error('Account permanently deactivated');
+    } else {
+      user.isDeactivate = false;
+      user.deactivateStartDate = null;
+      user.deactivateEndDate = null;
+      user.deactivateReason = null;
+      await user.save();
+    }
+  }
 
-  const data = {
-    user,
-    accessToken: user.generateAccessToken(payload)
+  const isPasswordValid = await bcrypt.compare(payload.password, user.password);
+
+  if (!isPasswordValid) throw new Error('Invalid password');
+
+  const tokenPayload = {
+    userId: user._id,
+    email: user.email,
+    userType: user.userType
   };
 
-  user.refreshToken = user.generateRefreshToken(payload);
-  await user.save({ validateBeforeSave: false });
+  const accessToken = createToken(tokenPayload, jwtSecret, jwtExpire);
 
-  return data;
+  if (String(user.toFactorAuth) === 'true') {
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const hashedOtp = await bcrypt.hash(otp, 10);
+    const otpExpires = new Date(Date.now() + 5 * 60 * 1000);
+
+    user.otp = hashedOtp;
+    user.otpExpires = otpExpires;
+    await user.save();
+
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: 'Your 2FA Verification Code',
+        html: verificationCodeTemplate(otp)
+      });
+    } catch (err) {
+      throw new Error('Could not send 2FA verification email');
+    }
+
+    // issue is here?..................
+    return {
+      message: 'Please verify your email',
+      accessToken
+    };
+  }
+
+  const userObj = user.toObject();
+  delete userObj.password;
+  delete userObj.resetPasswordOtp;
+  delete userObj.resetPasswordOtpExpires;
+  delete userObj.verificationOtp;
+  delete userObj.verificationOtpExpires;
+  delete userObj.otp;
+  delete userObj.otpExpires;
+
+  return {
+    accessToken,
+    user: userObj
+  };
 };
 
 export const refreshAccessTokenService = async (refreshToken) => {
