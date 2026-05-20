@@ -1,0 +1,184 @@
+{
+  "info": {
+    "name": "Mohammed Eltawous Backend - Collection",
+    "_postman_id": "mohammed-eltawous-backend-collection",
+    "description": "Collection for local testing of the API endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test User\",\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Refresh Access Token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"<paste-refresh-token-here>\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh-access-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "refresh-access-token"]
+            }
+          }
+        },
+        {
+          "name": "Verify Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-email",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "verify-email"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Workshop",
+      "item": [
+        {
+          "name": "Classify Forces",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Example input\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/workshop/classify",
+              "host": ["{{baseUrl}}"],
+              "path": ["workshop", "classify"]
+            }
+          }
+        },
+        {
+          "name": "Select Axes",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"axes\": []\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/workshop/axes",
+              "host": ["{{baseUrl}}"],
+              "path": ["workshop", "axes"]
+            }
+          }
+        },
+        {
+          "name": "Build Scenarios",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"scenarios\": []\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/workshop/scenarios",
+              "host": ["{{baseUrl}}"],
+              "path": ["workshop", "scenarios"]
+            }
+          }
+        },
+        {
+          "name": "Run Wind Tunnel",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"input\": {}\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/workshop/windtunnel",
+              "host": ["{{baseUrl}}"],
+              "path": ["workshop", "windtunnel"]
+            }
+          }
+        },
+        {
+          "name": "Generate Report",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reportData\": {}\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/workshop/report",
+              "host": ["{{baseUrl}}"],
+              "path": ["workshop", "report"]
+            }
+          }
+        },
+        {
+          "name": "Download Report (PDF)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reportData\": {}\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/workshop/report/download",
+              "host": ["{{baseUrl}}"],
+              "path": ["workshop", "report", "download"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

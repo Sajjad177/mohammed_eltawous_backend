@@ -10,8 +10,8 @@ const createToken = (payload, secret, expiresIn) => {
   return token;
 };
 
-const verifyToken = (token, secret) => {
+export const verifyToken = (token, secret) => {
   return jwt.verify(token, secret);
 };
 
-export { createToken, verifyToken };
+export { createToken };

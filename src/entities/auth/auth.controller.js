@@ -1,18 +1,14 @@
 import { StatusCodes } from 'http-status-codes';
 import { generateResponse } from '../../lib/responseFormate.js';
 import sendResponse from '../../lib/sendResponse.js';
-import User from './auth.model.js';
 import {
   loginUserService,
   refreshAccessTokenService,
-  forgetPasswordService,
-  verifyCodeService,
-  resetPasswordService,
-  changePasswordService,
-  registerUserService
+  registerUserService,
+  verifyUserEmail
 } from './auth.service.js';
 
-export const registerUser = async (req, res, next) => {
+export const registerUser = async (req, res) => {
   const result = await registerUserService(req.body);
 
   sendResponse(res, {
@@ -65,101 +61,23 @@ export const refreshAccessToken = async (req, res, next) => {
   }
 };
 
-export const forgetPassword = async (req, res, next) => {
-  const { email } = req.body;
+export const verifyEmail = async (req, res) => {
   try {
-    await forgetPasswordService(email);
-    generateResponse(
-      res,
-      200,
-      true,
-      'Verification code sent to your email',
-      null
-    );
-  } catch (error) {
-    if (error.message === 'Email is required') {
-      generateResponse(res, 400, false, 'Email is required', null);
-    } else if (error.message === 'Invalid email') {
-      generateResponse(res, 400, false, 'Invalid email', null);
-    } else {
-      next(error);
-    }
-  }
-};
+    const { email } = req.user;
+    const result = await verifyUserEmail(req.body, email);
 
-export const verifyCode = async (req, res, next) => {
-  const { otp, email } = req.body;
-  try {
-    await verifyCodeService({ otp, email });
-    generateResponse(res, 200, true, 'Verification successful', null);
+    sendResponse(res, {
+      statusCode: StatusCodes.OK,
+      success: true,
+      message: 'Email verified successfully',
+      data: result
+    });
   } catch (error) {
-    if (error.message === 'Email and otp are required') {
-      generateResponse(res, 400, false, 'Email and otp is required', null);
-    } else if (error.message === 'Invalid email') {
-      generateResponse(res, 400, false, 'Invalid email', null);
-    } else if (error.message === 'Otp not found') {
-      generateResponse(res, 404, false, 'Otp not found', null);
-    } else if (error.message === 'Invalid or expired otp') {
-      generateResponse(res, 403, false, 'Invalid or expired otp', null);
-    } else {
-      next(error);
-    }
-  }
-};
-
-export const resetPassword = async (req, res, next) => {
-  const { email, newPassword } = req.body;
-  try {
-    await resetPasswordService({ email, newPassword });
-    generateResponse(res, 200, true, 'Password reset successfully', null);
-  } catch (error) {
-    if (error.message === 'Email and new password are required') {
-      generateResponse(
-        res,
-        400,
-        false,
-        'Email and new password are required',
-        null
-      );
-    } else if (error.message === 'Invalid email') {
-      generateResponse(res, 400, false, 'Invalid email', null);
-    } else if (error.message === 'otp not cleared') {
-      generateResponse(res, 403, false, 'otp not cleared', null);
-    } else {
-      next(error);
-    }
-  }
-};
-
-export const changePassword = async (req, res, next) => {
-  const { oldPassword, newPassword } = req.body;
-  const userId = req.user._id;
-  try {
-    await changePasswordService({ userId, oldPassword, newPassword });
-    generateResponse(res, 200, true, 'Password changed successfully', null);
-  } catch (error) {
-    if (error.message === 'Old and new passwords are required') {
-      generateResponse(
-        res,
-        400,
-        false,
-        'Old and new passwords are required',
-        null
-      );
-    } else if (error.message === 'Password does not match') {
-      generateResponse(res, 400, false, 'Password does not match', null);
-    } else {
-      next(error);
-    }
-  }
-};
-
-export const logoutUser = async (req, res, next) => {
-  const userId = req.user._id;
-  try {
-    await User.findByIdAndUpdate(userId, { refreshToken: null });
-    generateResponse(res, 200, true, 'Logged out successfully', null);
-  } catch (error) {
-    next(error);
+    sendResponse(res, {
+      statusCode: StatusCodes.BAD_REQUEST,
+      success: false,
+      message: error.message,
+      data: null
+    });
   }
 };

@@ -1,90 +1,36 @@
-import jwt from 'jsonwebtoken';
-
-import RoleType from '../../lib/types.js';
-import User from '../../entities/auth/auth.model.js';
-import { generateResponse } from '../../lib/responseFormate.js';
+import { verifyToken } from '../../utility/tokenGenerate.js';
 import { jwtSecret } from '../config/config.js';
 
-export const verifyToken = async (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token)
-    return generateResponse(res, 401, false, 'No token, auth denied', null);
+const auth = (...roles) => {
+  return (req, res, next) => {
+    try {
+      const extractedToken = req.headers.authorization;
+      const token = extractedToken?.split(' ')[1];
+      if (!token) {
+        return res
+          .status(401)
+          .json({ success: false, message: 'Unauthorized' });
+      }
 
-  try {
-    const decoded = jwt.verify(token, jwtSecret);
-    const user = await User.findById(decoded._id).select(
-      '-password -createdAt -updatedAt -__v'
-    );
+      const verifiedUser = verifyToken(token, jwtSecret);
+      if (!verifiedUser) {
+        return res
+          .status(401)
+          .json({ success: false, message: 'Invalid token' });
+      }
+      req.user = verifiedUser;
 
-    if (!user) {
-      return generateResponse(res, 401, false, 'User not found', null);
+      if (roles.length && !roles.includes(verifiedUser.role)) {
+        return res.status(403).json({ success: false, message: 'Forbidden' });
+      }
+      next();
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'You are not authenticated'
+      });
     }
-    req.user = user;
-    next();
-  } catch (err) {
-    if (err.name === 'TokenExpiredError') {
-      return generateResponse(res, 401, false, 'Token expired', null);
-    } else if (err.name === 'JsonWebTokenError') {
-      return generateResponse(res, 401, false, 'Token is not valid', null);
-    } else if (err.name === 'NotBeforeError') {
-      return generateResponse(res, 401, false, 'Token not active', null);
-    } else {
-      next(err);
-    }
-  }
+  };
 };
 
-const userMiddleware = (req, res, next) => {
-  if (!req.user) {
-    return generateResponse(
-      res,
-      401,
-      false,
-      'Unauthorized: User not found',
-      null
-    );
-  }
-  const { role } = req.user;
-
-  if (role !== 'USER') {
-    generateResponse(res, 403, false, 'User access only', null);
-  }
-
-  next();
-};
-
-const adminMiddleware = (req, res, next) => {
-  if (!req.user) {
-    return generateResponse(
-      res,
-      401,
-      false,
-      'Unauthorized: Admin not found',
-      null
-    );
-  }
-  const { role } = req.user;
-
-  if (role !== 'ADMIN') {
-    generateResponse(res, 403, false, 'Admin access only', null);
-  }
-
-  next();
-};
-
-const userAdminMiddleware = (req, res, next) => {
-  const { role } = req.user || {};
-
-  if (![RoleType.USER, RoleType.ADMIN].includes(role)) {
-    return generateResponse(
-      res,
-      403,
-      false,
-      'User, Admin or Seller access only',
-      null
-    );
-  }
-  next();
-};
-
-export { userMiddleware, adminMiddleware, userAdminMiddleware };
+export default auth;
