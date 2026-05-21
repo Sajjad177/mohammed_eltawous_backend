@@ -7,6 +7,7 @@ import {
   refreshAccessTokenService,
   registerUserService,
   resendOtpCodeInEmail,
+  resetYourPassword,
   verifyUserEmail,
   verifyYourOtp
 } from './auth.service.js';
@@ -141,5 +142,20 @@ export const verifyOtp = async (req, res) => {
     return res
       .status(400)
       .json({ success: false, code: 400, message: error.message });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  try {
+    const { email } = req.user;
+    const result = await resetYourPassword(req.body, email);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password reset successfully',
+      data: result
+    });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message });
   }
 };
