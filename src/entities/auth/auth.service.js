@@ -11,6 +11,7 @@ import sendEmail from '../../lib/sendEmail.js';
 import { createToken } from '../../utility/tokenGenerate.js';
 import User from './auth.model.js';
 import { verificationCodeTemplate } from '../../lib/verificationCodeTemplate.js';
+import { companyName } from '../../lib/companyName.js';
 
 export const registerUserService = async (payload) => {
   const email = payload.email.toLowerCase();
@@ -94,23 +95,6 @@ export const login = async (payload) => {
   if (!user.isVerified)
     throw new Error('Please verify your email address first');
 
-  if (user.isDeactivate) {
-    //! there are some issues need to be fixed.
-    const now = new Date();
-    if (now > user.deactivateEndDate) {
-      user.isActive = false;
-      user.isDeactivate = true;
-      await user.save();
-      throw new Error('Account permanently deactivated');
-    } else {
-      user.isDeactivate = false;
-      user.deactivateStartDate = null;
-      user.deactivateEndDate = null;
-      user.deactivateReason = null;
-      await user.save();
-    }
-  }
-
   const isPasswordValid = await bcrypt.compare(payload.password, user.password);
 
   if (!isPasswordValid) throw new Error('Invalid password');
@@ -142,7 +126,6 @@ export const login = async (payload) => {
       throw new Error('Could not send 2FA verification email');
     }
 
-    // issue is here?..................
     return {
       message: 'Please verify your email',
       accessToken
@@ -168,7 +151,6 @@ export const refreshAccessTokenService = async (refreshToken) => {
   if (!refreshToken) throw new Error('No refresh token provided');
 
   const user = await User.findOne({ refreshToken });
-
   if (!user) throw new Error('Invalid refresh token');
 
   const decoded = jwt.verify(refreshToken, refreshTokenSecrete);
@@ -268,4 +250,35 @@ export const resendOtpCodeInEmail = async ({ email }) => {
     html: verificationCodeTemplate(otp)
   });
   return result;
+};
+
+export const forgotPassword = async (email) => {
+  if (!email) throw new Error('Email is required');
+
+  const isExistingUser = await User.findOne({ email });
+  if (!isExistingUser) throw new Error('User not found');
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const hashedOtp = await bcrypt.hash(otp, 10);
+  const otpExpires = new Date(Date.now() + 5 * 60 * 1000);
+
+  isExistingUser.resetPasswordOtp = hashedOtp;
+  isExistingUser.resetPasswordOtpExpires = otpExpires;
+  await isExistingUser.save();
+
+  await sendEmail({
+    to: email,
+    subject: `${companyName} - Password Reset OTP`,
+    html: verificationCodeTemplate(otp)
+  });
+
+  const JwtToken = {
+    userId: isExistingUser._id,
+    email: isExistingUser.email,
+    userType: isExistingUser.userType
+  };
+
+  const accessToken = createToken(JwtToken, jwtSecret, jwtExpire);
+
+  return { accessToken };
 };

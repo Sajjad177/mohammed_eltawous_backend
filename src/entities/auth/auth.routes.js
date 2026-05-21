@@ -1,5 +1,6 @@
 import express from 'express';
 import {
+  forgotPassword,
   loginUser,
   refreshAccessToken,
   registerUser,
@@ -25,6 +26,8 @@ router.post(
   auth(USER_ROLE.user, USER_ROLE.admin),
   resendOtpCode
 );
+
+router.post('/forgot-password', forgotPassword);
 
 const authRoutes = router;
 export default authRoutes;

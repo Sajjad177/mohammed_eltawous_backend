@@ -104,3 +104,21 @@ export const resendOtpCode = async (req, res) => {
     return res.status(400).json({ success: false, message: error.message });
   }
 };
+
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const result = await forgotPassword(email);
+
+    return res.status(200).json({
+      success: true,
+      code: 200,
+      message: 'OTP sent to your email',
+      data: result
+    });
+  } catch (error) {
+    return res
+      .status(400)
+      .json({ success: false, code: 400, message: error.message });
+  }
+};

@@ -43,6 +43,10 @@ const userModel = new Schema(
       type: Boolean,
       default: true
     },
+    isDelete: {
+      type: Boolean,
+      default: false
+    },
     address: {
       type: String,
       default: null
