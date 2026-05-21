@@ -5,6 +5,7 @@ import {
   refreshAccessToken,
   registerUser,
   resendOtpCode,
+  resetPassword,
   verifyEmail,
   verifyOtp
 } from './auth.controller.js';
@@ -31,6 +32,11 @@ router.post(
 router.post('/forgot-password', forgotPassword);
 
 router.post('/verify-otp', auth(USER_ROLE.user, USER_ROLE.admin), verifyOtp);
+router.post(
+  '/reset-password',
+  auth(USER_ROLE.user, USER_ROLE.admin),
+  resetPassword
+);
 
 const authRoutes = router;
 export default authRoutes;

@@ -4,7 +4,8 @@ import {
   jwtExpire,
   jwtSecret,
   refreshTokenExpiresIn,
-  refreshTokenSecrete
+  refreshTokenSecrete,
+  salt
 } from '../../core/config/config.js';
 // import verificationCodeTemplate from '../../lib/emailTemplates.js';
 import sendEmail from '../../lib/sendEmail.js';
@@ -319,4 +320,38 @@ export const verifyYourOtp = async (otp, email) => {
   const accessToken = createToken(JwtToken, jwtSecret, jwtExpire);
 
   return { accessToken };
+};
+
+export const resetYourPassword = async (payload, email) => {
+  if (!payload.newPassword) {
+    throw new Error('Email and new password are required');
+  }
+
+  const isExistingUser = await User.findOne({ email });
+  if (!isExistingUser) throw new Error('User not found');
+
+  // --- CHECK OLD PASSWORD ---
+  const isSamePassword = await bcrypt.compare(
+    payload.newPassword,
+    isExistingUser.password
+  );
+  if (isSamePassword) {
+    throw new Error('New password must be different from old password');
+  }
+
+  const hashedPassword = await bcrypt.hash(payload.newPassword, Number(salt));
+
+  const result = await User.findOneAndUpdate(
+    { email },
+    {
+      password: hashedPassword,
+      otp: undefined,
+      otpExpires: undefined
+    },
+    { new: true }
+  ).select(
+    '-password -otp -otpExpires -resetPasswordOtp -resetPasswordOtpExpires'
+  );
+
+  return result;
 };
