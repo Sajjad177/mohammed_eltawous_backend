@@ -5,7 +5,8 @@ import {
   refreshAccessToken,
   registerUser,
   resendOtpCode,
-  verifyEmail
+  verifyEmail,
+  verifyOtp
 } from './auth.controller.js';
 import auth from '../../core/middlewares/authMiddleware.js';
 import { USER_ROLE } from '../user/user.constant.js';
@@ -28,6 +29,8 @@ router.post(
 );
 
 router.post('/forgot-password', forgotPassword);
+
+router.post('/verify-otp', auth(USER_ROLE.user, USER_ROLE.admin), verifyOtp);
 
 const authRoutes = router;
 export default authRoutes;

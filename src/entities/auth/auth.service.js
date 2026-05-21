@@ -252,7 +252,7 @@ export const resendOtpCodeInEmail = async ({ email }) => {
   return result;
 };
 
-export const forgotPassword = async (email) => {
+export const forgotYourPassword = async (email) => {
   if (!email) throw new Error('Email is required');
 
   const isExistingUser = await User.findOne({ email });
@@ -275,7 +275,45 @@ export const forgotPassword = async (email) => {
   const JwtToken = {
     userId: isExistingUser._id,
     email: isExistingUser.email,
-    userType: isExistingUser.userType
+    role: isExistingUser.role
+  };
+
+  const accessToken = createToken(JwtToken, jwtSecret, jwtExpire);
+
+  return { accessToken };
+};
+
+export const verifyYourOtp = async (otp, email) => {
+  if (!otp) throw new Error('OTP are required');
+
+  const isExistingUser = await User.findOne({ email });
+  if (!isExistingUser) throw new Error('User not found');
+
+  if (
+    !isExistingUser.resetPasswordOtp ||
+    !isExistingUser.resetPasswordOtpExpires
+  ) {
+    throw new Error('Password reset OTP not requested or has expired');
+  }
+
+  if (isExistingUser.resetPasswordOtpExpires < new Date()) {
+    throw new Error('Password reset OTP has expired');
+  }
+
+  const isOtpMatched = await bcrypt.compare(
+    otp.toString(),
+    isExistingUser.resetPasswordOtp
+  );
+  if (!isOtpMatched) throw new Error('Invalid OTP ');
+
+  isExistingUser.resetPasswordOtp = undefined;
+  isExistingUser.resetPasswordOtpExpires = undefined;
+  await isExistingUser.save();
+
+  const JwtToken = {
+    userId: isExistingUser._id,
+    email: isExistingUser.email,
+    role: isExistingUser.role
   };
 
   const accessToken = createToken(JwtToken, jwtSecret, jwtExpire);
