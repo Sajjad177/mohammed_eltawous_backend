@@ -2,12 +2,14 @@ import { StatusCodes } from 'http-status-codes';
 import { generateResponse } from '../../lib/responseFormate.js';
 import sendResponse from '../../lib/sendResponse.js';
 import {
+  changeYourPassword,
   forgotYourPassword,
   login,
   refreshAccessTokenService,
   registerUserService,
   resendOtpCodeInEmail,
   resetYourPassword,
+  toggleYourTwoFactorAuthentication,
   verifyUserEmail,
   verifyYourOtp
 } from './auth.service.js';
@@ -153,6 +155,36 @@ export const resetPassword = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: 'Password reset successfully',
+      data: result
+    });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const changePassword = async (req, res) => {
+  try {
+    const { email } = req.user;
+    const result = await changeYourPassword(req.body, email);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password changed successfully',
+      data: result
+    });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const toggleTwoFactorAuthentication = async (req, res) => {
+  try {
+    const { email } = req.user;
+    const result = await toggleYourTwoFactorAuthentication(email);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Two-factor authentication toggled successfully',
       data: result
     });
   } catch (error) {

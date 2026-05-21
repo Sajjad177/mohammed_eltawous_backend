@@ -1,11 +1,13 @@
 import express from 'express';
 import {
+  changePassword,
   forgotPassword,
   loginUser,
   refreshAccessToken,
   registerUser,
   resendOtpCode,
   resetPassword,
+  toggleTwoFactorAuthentication,
   verifyEmail,
   verifyOtp
 } from './auth.controller.js';
@@ -36,6 +38,18 @@ router.post(
   '/reset-password',
   auth(USER_ROLE.user, USER_ROLE.admin),
   resetPassword
+);
+
+router.post(
+  '/change-password',
+  auth(USER_ROLE.user, USER_ROLE.admin),
+  changePassword
+);
+
+router.post(
+  '/toggle-auth',
+  auth(USER_ROLE.user, USER_ROLE.admin),
+  toggleTwoFactorAuthentication
 );
 
 const authRoutes = router;

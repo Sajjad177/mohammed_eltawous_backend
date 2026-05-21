@@ -355,3 +355,51 @@ export const resetYourPassword = async (payload, email) => {
 
   return result;
 };
+
+export const changeYourPassword = async (payload, email) => {
+  const { currentPassword, newPassword } = payload;
+  if (!currentPassword || !newPassword) {
+    throw new Error('Current and new passwords are required');
+  }
+
+  if (currentPassword === newPassword) {
+    throw new Error('Passwords must be different');
+  }
+
+  const isExistingUser = await User.findOne({ email });
+  if (!isExistingUser) throw new Error('User not found');
+
+  const isPasswordMatched = await bcrypt.compare(
+    currentPassword,
+    isExistingUser.password
+  );
+  if (!isPasswordMatched) throw new Error('Invalid current password');
+
+  const hashedPassword = await bcrypt.hash(newPassword, Number(salt));
+
+  const result = await User.findOneAndUpdate(
+    { email },
+    {
+      password: hashedPassword
+    },
+    { new: true }
+  ).select(
+    '-password -otp -otpExpires -resetPasswordOtp -resetPasswordOtpExpires'
+  );
+  return result;
+};
+
+export const toggleYourTwoFactorAuthentication = async (email) => {
+  const user = await User.findOne({ email });
+  if (!user) throw new Error('User not found');
+
+  user.toFactorAuth = !user.toFactorAuth;
+  await user.save();
+
+  return {
+    success: true,
+    message: `Two-factor authentication ${
+      user.toFactorAuth ? 'enabled' : 'disabled'
+    } successfully`
+  };
+};
