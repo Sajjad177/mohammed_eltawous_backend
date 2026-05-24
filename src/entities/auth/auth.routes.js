@@ -1,7 +1,9 @@
 import express from 'express';
 import {
   changePassword,
+  facebookCallBack,
   forgotPassword,
+  googleCallback,
   loginUser,
   refreshAccessToken,
   registerUser,
@@ -13,6 +15,7 @@ import {
 } from './auth.controller.js';
 import auth from '../../core/middlewares/authMiddleware.js';
 import { USER_ROLE } from '../user/user.constant.js';
+import passport from 'passport';
 
 const router = express.Router();
 
@@ -50,6 +53,35 @@ router.post(
   '/toggle-auth',
   auth(USER_ROLE.user, USER_ROLE.admin),
   toggleTwoFactorAuthentication
+);
+
+router.get('/google', async (req, res, next) => {
+  const redirect = req.query.redirect || '/';
+
+  passport.authenticate('google', {
+    scope: ['email', 'profile'],
+    state: redirect
+  })(req, res, next);
+});
+
+router.get(
+  '/google/callback',
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  googleCallback
+);
+
+router.get(
+  '/facebook/callback',
+  passport.authenticate('facebook', {
+    session: false,
+    failureRedirect: '/login'
+  }),
+  facebookCallBack
+);
+
+router.get(
+  '/facebook',
+  passport.authenticate('facebook', { scope: ['email', 'public_profile'] })
 );
 
 const authRoutes = router;

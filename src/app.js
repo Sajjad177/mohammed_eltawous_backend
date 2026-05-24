@@ -10,18 +10,29 @@ import morgan from 'morgan';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import xssClean from 'xss-clean';
-
 import logger from './core/config/logger.js';
-// import errorHandler from './core/middlewares/errorMiddleware.js';
 import appRouter from './core/app/appRouter.js';
 import { globalErrorHandler } from './core/middlewares/globalErrorHandler.js';
 import notFound from './core/middlewares/notFound.js';
 import { globalLimiter } from './lib/limit.js';
+import passport from 'passport';
+import expressSession from 'express-session';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+app.use(
+  expressSession({
+    secret: 'keyboard cat',
+    resave: false,
+    saveUninitialized: false
+  })
+);
+
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Set up security middleware
 app.use(helmet());
