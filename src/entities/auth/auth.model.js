@@ -1,5 +1,6 @@
 import mongoose, { Schema } from 'mongoose';
 import bcrypt from 'bcrypt';
+import { salt } from '../../core/config/config.js';
 
 const userModel = new Schema(
   {
@@ -15,8 +16,8 @@ const userModel = new Schema(
     bio: { type: String, default: null },
     jobTitle: { type: String, default: null },
     password: {
-      type: String,
-      min: [8, 'Password must be at least 8 characters']
+      type: String
+      // min: [8, 'Password must be at least 8 characters']
     },
     phone: {
       type: String
@@ -56,8 +57,20 @@ const userModel = new Schema(
 );
 
 userModel.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 10);
+  if (!this.isModified('password')) {
+    return next();
+  }
+
+  if (!this.password) {
+    return next(new Error('Password is required'));
+  }
+
+  const saltRounds = Number(salt) || 10;
+  if (!saltRounds) {
+    return next(new Error('Bcrypt salt rounds not configured'));
+  }
+
+  this.password = await bcrypt.hash(this.password, saltRounds);
   next();
 });
 

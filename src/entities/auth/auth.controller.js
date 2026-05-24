@@ -13,6 +13,16 @@ import {
   verifyUserEmail,
   verifyYourOtp
 } from './auth.service.js';
+import {
+  env,
+  frontendUrl,
+  jwtExpire,
+  jwtSecret,
+  refreshTokenExpiresIn,
+  refreshTokenSecrete
+} from '../../core/config/config.js';
+import { createToken } from '../../utility/tokenGenerate.js';
+import { AppError } from '../../utility/AppError.js';
 
 export const registerUser = async (req, res) => {
   const result = await registerUserService(req.body);
@@ -190,4 +200,150 @@ export const toggleTwoFactorAuthentication = async (req, res) => {
   } catch (error) {
     return res.status(400).json({ success: false, message: error.message });
   }
+};
+
+export const googleCallback = async (req, res) => {
+  // Step 1: safe parse state
+  let redirectUrl = '';
+
+  try {
+    if (
+      req.query.state &&
+      typeof req.query.state === 'string' &&
+      req.query.state.startsWith('{')
+    ) {
+      const parsedState = JSON.parse(req.query.state);
+      redirectUrl = parsedState?.redirect || '';
+    } else if (typeof req.query.state === 'string') {
+      redirectUrl = req.query.state;
+    }
+  } catch (err) {
+    redirectUrl = '';
+  }
+
+  // Step 2: remove leading "/"
+  if (redirectUrl.startsWith('/')) {
+    redirectUrl = redirectUrl.slice(1);
+  }
+
+  const user = req.user;
+
+  if (!user) {
+    throw new AppError('User not found', StatusCodes.NOT_FOUND);
+  }
+
+  const tokenPayload = {
+    id: user._id,
+    email: user.email,
+    role: user.role
+  };
+
+  const accessToken = createToken(tokenPayload, jwtSecret, jwtExpire);
+
+  const refreshToken = createToken(
+    tokenPayload,
+    refreshTokenSecrete,
+    refreshTokenExpiresIn
+  );
+
+  res.cookie('accessToken', accessToken, {
+    httpOnly: true,
+    secure: env === 'production',
+    sameSite: env === 'production' ? 'none' : 'lax',
+    maxAge: 15 * 60 * 1000
+  });
+
+  res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure: env === 'production',
+    sameSite: env === 'production' ? 'none' : 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000
+  });
+
+  // Step 3: safe redirect
+  const finalRedirect = redirectUrl
+    ? `${frontendUrl}/${redirectUrl}`
+    : frontendUrl;
+
+  res.redirect(finalRedirect);
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: 'You have logged with Google successfully.',
+    data: { accessToken }
+  });
+};
+
+export const facebookCallBack = async (req, res) => {
+  // Step 1: safe parse state
+  let redirectUrl = '';
+
+  try {
+    if (
+      req.query.state &&
+      typeof req.query.state === 'string' &&
+      req.query.state.startsWith('{')
+    ) {
+      const parsedState = JSON.parse(req.query.state);
+      redirectUrl = parsedState?.redirect || '';
+    } else if (typeof req.query.state === 'string') {
+      redirectUrl = req.query.state;
+    }
+  } catch (err) {
+    redirectUrl = '';
+  }
+
+  // Step 2: remove leading "/"
+  if (redirectUrl.startsWith('/')) {
+    redirectUrl = redirectUrl.slice(1);
+  }
+
+  const user = req.user;
+
+  if (!user) {
+    throw new AppError('User not found', StatusCodes.NOT_FOUND);
+  }
+
+  const tokenPayload = {
+    id: user._id,
+    email: user.email,
+    role: user.role
+  };
+
+  const accessToken = createToken(tokenPayload, jwtSecret, jwtExpire);
+
+  const refreshToken = createToken(
+    tokenPayload,
+    refreshTokenSecrete,
+    refreshTokenExpiresIn
+  );
+
+  res.cookie('accessToken', accessToken, {
+    httpOnly: true,
+    secure: env === 'production',
+    sameSite: env === 'production' ? 'none' : 'lax',
+    maxAge: 15 * 60 * 1000
+  });
+
+  res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure: env === 'production',
+    sameSite: env === 'production' ? 'none' : 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000
+  });
+
+  // Step 3: safe redirect
+  const finalRedirect = redirectUrl
+    ? `${frontendUrl}/${redirectUrl}`
+    : frontendUrl;
+
+  res.redirect(finalRedirect);
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: 'You have logged with facebook is successfully.',
+    data: { accessToken }
+  });
 };
