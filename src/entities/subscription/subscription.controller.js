@@ -3,7 +3,7 @@ import { PRICING_PLANS } from '../../core/config/pricing.js';
 import { catchAsync } from '../../utility/catchAsync.js';
 
 export const getSubscriptionStatus = catchAsync(async (req, res, next) => {
-  const userId = req.user.id;
+  const userId = req.user.userId;
 
   const subscription = await subscriptionService.getSubscription(userId);
 
@@ -21,7 +21,7 @@ export const getSubscriptionStatus = catchAsync(async (req, res, next) => {
 });
 
 export const getCreditHistory = catchAsync(async (req, res, next) => {
-  const userId = req.user.id;
+  const userId = req.user.userId;
   const { limit = 50 } = req.query;
 
   const history = await subscriptionService.getCreditHistory(userId, parseInt(limit));

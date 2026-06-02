@@ -1,8 +1,9 @@
+/* eslint-disable no-useless-catch */
 import subscriptionService from '../../entities/subscription/subscription.service.js';
 
 export const checkCreditsAvailable = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const requiredCredits = req.body.requiredCredits || 1;
 
     const subscription = await subscriptionService.getSubscription(userId);
