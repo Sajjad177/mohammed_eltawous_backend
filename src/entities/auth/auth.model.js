@@ -51,6 +51,20 @@ const userModel = new Schema(
     address: {
       type: String,
       default: null
+    },
+    // Subscription fields
+    subscriptionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Subscription',
+      default: null
+    },
+    totalCreditsEverUsed: {
+      type: Number,
+      default: 0
+    },
+    lastPurchaseAt: {
+      type: Date,
+      default: null
     }
   },
   { timestamps: true, versionKey: false }

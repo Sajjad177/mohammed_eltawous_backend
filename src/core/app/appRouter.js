@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import workshopRoutes from '../../entities/workshop/workshop.routes.js';
 import authRoutes from '../../entities/auth/auth.routes.js';
+import subscriptionRoutes from '../../entities/subscription/subscription.routes.js';
 
 const router = Router();
 
@@ -13,6 +14,10 @@ const moduleRouter = [
   {
     path: '/workshop',
     router: workshopRoutes
+  },
+  {
+    path: '/subscription',
+    router: subscriptionRoutes
   }
 ];
 

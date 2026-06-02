@@ -1,0 +1,719 @@
+{
+  "info": {
+    "name": "Mohammed Eltawous - Subscription, Payment, Workshop APIs",
+    "description": "Postman collection for Stripe credit purchase, subscription status, workshop generation, report markdown, PDF upload, and history APIs. Set accessToken after login. Frontend only sends tier for payment; backend forces AED and redirect URLs from FRONTEND_URL.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/v1"
+    },
+    {
+      "key": "accessToken",
+      "value": "PASTE_USER_ACCESS_TOKEN_HERE"
+    },
+    {
+      "key": "paymentId",
+      "value": "PASTE_PAYMENT_ID_FROM_INITIALIZE_PAYMENT"
+    },
+    {
+      "key": "sessionId",
+      "value": "PASTE_SESSION_ID_FROM_CLASSIFY"
+    }
+  ],
+  "item": [
+    {
+      "name": "Subscription & Payment",
+      "item": [
+        {
+          "name": "Get Available Plans",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/subscription/plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscription",
+                "plans"
+              ]
+            },
+            "description": "Public endpoint. Returns starter, professional, and strategic plans with AED/USD/EUR/GBP pricing. Payment start currently uses AED only."
+          },
+          "response": [
+            {
+              "name": "Example response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/subscription/plans"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"starter\": {\n      \"name\": \"Starter\",\n      \"credits\": 3,\n      \"prices\": {\n        \"AED\": {\n          \"amount\": 49900,\n          \"currency\": \"aed\"\n        }\n      }\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Initialize Payment - Frontend Sends Only Plan",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tier\": \"starter\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/subscription/initialize-payment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscription",
+                "initialize-payment"
+              ]
+            },
+            "description": "Protected endpoint. Frontend sends only tier. Backend uses logged-in user from Bearer token, forces AED, creates Stripe Checkout Session, and saves local Payment as pending. Copy data.paymentId into the paymentId collection variable. Open data.checkoutUrl in browser to pay."
+          },
+          "response": [
+            {
+              "name": "Example response",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"tier\": \"starter\"\n}"
+                },
+                "url": "{{baseUrl}}/subscription/initialize-payment"
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"message\": \"Checkout session created. Redirect to checkoutUrl.\",\n  \"data\": {\n    \"paymentId\": \"665f1234567890abcdef1234\",\n    \"checkoutUrl\": \"https://checkout.stripe.com/c/pay/cs_test_xxx\",\n    \"sessionId\": \"cs_test_xxx\",\n    \"amount\": 49900,\n    \"currency\": \"aed\",\n    \"creditsToAdd\": 3,\n    \"tier\": \"starter\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Payment Status",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/subscription/payment-status/{{paymentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscription",
+                "payment-status",
+                "{{paymentId}}"
+              ]
+            },
+            "description": "Protected endpoint. Returns status only if the payment belongs to the logged-in user. Status changes from pending to succeeded after the cron verifies Stripe payment."
+          },
+          "response": [
+            {
+              "name": "Example response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/subscription/payment-status/{{paymentId}}"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"status\": \"succeeded\",\n    \"verificationAttempts\": 1,\n    \"verifiedAt\": \"2026-06-02T10:00:00.000Z\",\n    \"failureReason\": null,\n    \"creditsAdded\": 3\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Subscription Status",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/subscription/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscription",
+                "status"
+              ]
+            },
+            "description": "Protected endpoint. Frontend can call this after payment to check current tier and available credits."
+          },
+          "response": [
+            {
+              "name": "Example response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/subscription/status"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"tier\": \"starter\",\n    \"totalCredits\": 3,\n    \"usedCredits\": 1,\n    \"availableCredits\": 2,\n    \"isActive\": true,\n    \"lastPurchaseAt\": \"2026-06-02T10:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Credit History",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/subscription/credit-history?limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscription",
+                "credit-history"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Protected endpoint. Returns purchase, usage, bonus, and refund credit transactions for the logged-in user."
+          },
+          "response": [
+            {
+              "name": "Example response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/subscription/credit-history?limit=20"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"type\": \"purchase\",\n      \"amount\": 3,\n      \"balanceBefore\": 0,\n      \"balanceAfter\": 3,\n      \"description\": \"Purchased starter tier - 3 credits\"\n    },\n    {\n      \"type\": \"usage\",\n      \"amount\": 1,\n      \"balanceBefore\": 3,\n      \"balanceAfter\": 2,\n      \"description\": \"Used for analysis\"\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Workshop Generation",
+      "item": [
+        {
+          "name": "Classify Forces - Costs 1 Credit After Success",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company\": {\n    \"name\": \"Nova Retail\",\n    \"industry\": \"E-commerce\",\n    \"region\": \"UAE\",\n    \"focalQuestion\": \"How can Nova Retail grow profitably by 2030?\",\n    \"horizonYear\": \"2030\",\n    \"description\": \"Nova Retail is an online fashion and lifestyle marketplace serving GCC customers.\"\n  },\n  \"forces\": [\n    \"AI-driven personalization becomes standard in online retail\",\n    \"Customer acquisition costs continue to rise\",\n    \"Cross-border logistics become faster and cheaper\",\n    \"New data privacy regulations limit personalized advertising\",\n    \"Sustainability expectations increase among younger consumers\",\n    \"Large global marketplaces enter the GCC more aggressively\"\n  ],\n  \"conversationHistory\": []\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/workshop/classify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workshop",
+                "classify"
+              ]
+            },
+            "description": "Protected endpoint. Creates a WorkshopAnalysis linked to logged-in user, checks available credits, calls Claude, deducts 1 credit only after successful generation, saves classification, and returns sessionId. Copy sessionId into the sessionId collection variable."
+          },
+          "response": [
+            {
+              "name": "Example response",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                },
+                "url": "{{baseUrl}}/workshop/classify"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"predetermined\": [\n      \"AI-driven personalization becomes standard in online retail\"\n    ],\n    \"uncertainties\": [\n      \"Customer acquisition costs continue to rise\",\n      \"Large global marketplaces enter the GCC more aggressively\"\n    ]\n  },\n  \"sessionId\": \"0d4d17a6-9b71-44c6-9b7c-f6fce5a7d111\",\n  \"creditsRemaining\": 2,\n  \"history\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Select Axes",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"{{sessionId}}\",\n  \"company\": {\n    \"name\": \"Nova Retail\",\n    \"industry\": \"E-commerce\",\n    \"region\": \"UAE\",\n    \"focalQuestion\": \"How can Nova Retail grow profitably by 2030?\",\n    \"horizonYear\": \"2030\"\n  },\n  \"classification\": {\n    \"predetermined\": [\n      \"AI-driven personalization becomes standard in online retail\",\n      \"Sustainability expectations increase among younger consumers\"\n    ],\n    \"uncertainties\": [\n      \"Customer acquisition costs continue to rise\",\n      \"Cross-border logistics become faster and cheaper\",\n      \"New data privacy regulations limit personalized advertising\",\n      \"Large global marketplaces enter the GCC more aggressively\"\n    ]\n  },\n  \"conversationHistory\": []\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/workshop/axes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workshop",
+                "axes"
+              ]
+            },
+            "description": "Protected endpoint. Finds WorkshopAnalysis by sessionId and logged-in user, generates axes, saves axes, and updates lastActivityAt."
+          },
+          "response": [
+            {
+              "name": "Example response",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                },
+                "url": "{{baseUrl}}/workshop/axes"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"axisA\": {\n      \"label\": \"Customer Acquisition Cost\",\n      \"selectedForce\": \"Customer acquisition costs continue to rise\",\n      \"poleA1\": \"Low acquisition cost\",\n      \"poleA2\": \"Very high acquisition cost\",\n      \"reason\": \"This directly affects profitable growth.\"\n    },\n    \"axisB\": {\n      \"label\": \"Global Marketplace Pressure\",\n      \"selectedForce\": \"Large global marketplaces enter the GCC more aggressively\",\n      \"poleB1\": \"Limited global pressure\",\n      \"poleB2\": \"Intense global pressure\",\n      \"reason\": \"This changes competitive dynamics.\"\n    }\n  },\n  \"sessionId\": \"{{sessionId}}\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Build Scenarios",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"{{sessionId}}\",\n  \"company\": {\n    \"name\": \"Nova Retail\",\n    \"focalQuestion\": \"How can Nova Retail grow profitably by 2030?\",\n    \"horizonYear\": \"2030\"\n  },\n  \"axes\": {\n    \"axisA\": {\n      \"label\": \"Customer Acquisition Cost\",\n      \"selectedForce\": \"Customer acquisition costs continue to rise\",\n      \"poleA1\": \"Low acquisition cost\",\n      \"poleA2\": \"Very high acquisition cost\",\n      \"reason\": \"This directly affects profitable growth.\"\n    },\n    \"axisB\": {\n      \"label\": \"Global Marketplace Pressure\",\n      \"selectedForce\": \"Large global marketplaces enter the GCC more aggressively\",\n      \"poleB1\": \"Limited global pressure\",\n      \"poleB2\": \"Intense global pressure\",\n      \"reason\": \"This changes competitive dynamics.\"\n    }\n  },\n  \"forces\": [\n    \"AI-driven personalization becomes standard in online retail\",\n    \"Customer acquisition costs continue to rise\",\n    \"Cross-border logistics become faster and cheaper\",\n    \"New data privacy regulations limit personalized advertising\",\n    \"Sustainability expectations increase among younger consumers\",\n    \"Large global marketplaces enter the GCC more aggressively\"\n  ],\n  \"conversationHistory\": []\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/workshop/scenarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workshop",
+                "scenarios"
+              ]
+            },
+            "description": "Protected endpoint. Finds the user's workshop by sessionId, generates four scenarios, saves scenarios, and updates lastActivityAt."
+          },
+          "response": [
+            {
+              "name": "Example response",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                },
+                "url": "{{baseUrl}}/workshop/scenarios"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"scenarios\": [\n      {\n        \"id\": 1,\n        \"combination\": \"A1+B1\",\n        \"name\": \"Local Advantage\",\n        \"story\": \"Nova Retail operates in a market with manageable acquisition costs and limited global competition.\",\n        \"implications\": \"Nova can grow through owned channels and niche depth.\",\n        \"signposts\": [\n          \"Lower ad auction prices\",\n          \"Stable marketplace share\"\n        ]\n      }\n    ]\n  },\n  \"sessionId\": \"{{sessionId}}\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Run Wind Tunnel",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"{{sessionId}}\",\n  \"company\": {\n    \"name\": \"Nova Retail\",\n    \"focalQuestion\": \"How can Nova Retail grow profitably by 2030?\",\n    \"horizonYear\": \"2030\"\n  },\n  \"scenarios\": [\n    {\n      \"id\": 1,\n      \"name\": \"Local Advantage\",\n      \"story\": \"Nova Retail operates in a market with manageable acquisition costs and limited global competition.\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"Expensive Attention\",\n      \"story\": \"Customer acquisition becomes expensive, but global competition remains limited.\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"Marketplace Storm\",\n      \"story\": \"Global platforms enter aggressively while acquisition costs stay manageable.\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"Margin Squeeze\",\n      \"story\": \"Acquisition costs rise sharply and global marketplaces compete aggressively.\"\n    }\n  ],\n  \"strategicOptions\": [\n    \"Build a loyalty-driven private label business\",\n    \"Invest heavily in AI personalization\",\n    \"Expand into premium niche categories\"\n  ],\n  \"conversationHistory\": []\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/workshop/windtunnel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workshop",
+                "windtunnel"
+              ]
+            },
+            "description": "Protected endpoint. Finds the user's workshop by sessionId, generates wind tunnel results, saves windTunnelResults, and updates lastActivityAt. If strategicOptions is empty, AI generates options."
+          },
+          "response": [
+            {
+              "name": "Example response",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                },
+                "url": "{{baseUrl}}/workshop/windtunnel"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"windTunnel\": [\n      [\n        {\n          \"rating\": \"Good\",\n          \"reasoning\": \"The option builds owned customer relationships and reduces paid acquisition exposure. It remains useful even if marketplace pressure rises.\"\n        }\n      ]\n    ],\n    \"robustMoves\": {\n      \"noRegret\": [\n        \"Improve customer retention\"\n      ],\n      \"keepOpen\": [\n        \"Selective marketplace partnerships\"\n      ],\n      \"defer\": [\n        \"Large physical retail expansion\"\n      ]\n    },\n    \"strategicConclusion\": \"Nova should reduce dependency on paid acquisition.\",\n    \"recommendedOption\": \"Invest heavily in AI personalization\"\n  },\n  \"sessionId\": \"{{sessionId}}\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Generate Report Markdown - Streaming",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"{{sessionId}}\",\n  \"workshopState\": {\n    \"company\": {\n      \"name\": \"Nova Retail\",\n      \"industry\": \"E-commerce\",\n      \"region\": \"UAE\",\n      \"focalQuestion\": \"How can Nova Retail grow profitably by 2030?\",\n      \"horizonYear\": \"2030\"\n    },\n    \"classification\": {\n      \"predetermined\": [\n        \"AI-driven personalization becomes standard in online retail\"\n      ],\n      \"uncertainties\": [\n        \"Customer acquisition costs continue to rise\",\n        \"Large global marketplaces enter the GCC more aggressively\"\n      ]\n    },\n    \"axes\": {\n      \"axisA\": {\n        \"label\": \"Customer Acquisition Cost\",\n        \"poleA1\": \"Low acquisition cost\",\n        \"poleA2\": \"Very high acquisition cost\"\n      },\n      \"axisB\": {\n        \"label\": \"Global Marketplace Pressure\",\n        \"poleB1\": \"Limited global pressure\",\n        \"poleB2\": \"Intense global pressure\"\n      }\n    },\n    \"scenarios\": [\n      {\n        \"name\": \"Local Advantage\",\n        \"story\": \"Nova Retail operates in a market with manageable acquisition costs and limited global competition.\"\n      },\n      {\n        \"name\": \"Margin Squeeze\",\n        \"story\": \"Acquisition costs rise sharply and global marketplaces compete aggressively.\"\n      }\n    ],\n    \"windTunnelResults\": {\n      \"recommendedOption\": \"Invest heavily in AI personalization\",\n      \"strategicConclusion\": \"Nova Retail should build defensible customer relationships and reduce reliance on paid acquisition.\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/workshop/report",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workshop",
+                "report"
+              ]
+            },
+            "description": "Protected endpoint. Streams markdown text/plain. After stream completes, backend saves the full markdown to WorkshopAnalysis.report and sets completedAt. In Postman, the response appears as plain streamed text plus a final ###JSON_DATA### marker."
+          },
+          "response": [
+            {
+              "name": "Example streamed response",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                },
+                "url": "{{baseUrl}}/workshop/report"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "text",
+              "body": "## Executive Summary\nNova Retail should focus on loyalty, AI personalization, and differentiated category depth.\n\n## Recommendations\n- Build owned customer relationships\n- Reduce dependence on paid acquisition\n\n###JSON_DATA###{\"success\":true,\"reportMarkdown\":\"## Executive Summary\\n...\",\"generatedAt\":\"2026-06-02T10:00:00.000Z\",\"sessionId\":\"{{sessionId}}\"}"
+            }
+          ]
+        },
+        {
+          "name": "Generate PDF And Upload To Cloudinary",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"{{sessionId}}\",\n  \"companyName\": \"Nova Retail\",\n  \"reportMarkdown\": \"## Executive Summary\\nNova Retail should focus on loyalty, AI personalization, and niche category depth.\\n\\n## Focal Question\\nHow can Nova Retail grow profitably by 2030?\\n\\n## Recommendations\\n- Build owned customer relationships\\n- Reduce dependence on paid acquisition\\n- Create differentiated private label offerings\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/workshop/report/download",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workshop",
+                "report",
+                "download"
+              ]
+            },
+            "description": "Protected endpoint. Verifies session belongs to logged-in user, converts reportMarkdown to PDF using PDFKit, uploads it to Cloudinary, saves pdfUrl/pdfFileName/pdfGeneratedAt on WorkshopAnalysis, and returns the Cloudinary URL."
+          },
+          "response": [
+            {
+              "name": "Example response",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                },
+                "url": "{{baseUrl}}/workshop/report/download"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"url\": \"https://res.cloudinary.com/demo/raw/upload/workshop_reports/report_1780000000000.pdf\",\n    \"fileName\": \"Nova_Retail_Strategic_Report.pdf\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Workshop History",
+      "item": [
+        {
+          "name": "Get Workshop History",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/workshop/history?limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workshop",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Protected endpoint. Returns the logged-in user's recent workshop sessions with saved markdown report and PDF metadata for frontend history list."
+          },
+          "response": [
+            {
+              "name": "Example response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/workshop/history?limit=20"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"sessionId\": \"0d4d17a6-9b71-44c6-9b7c-f6fce5a7d111\",\n      \"company\": {\n        \"name\": \"Nova Retail\"\n      },\n      \"creditsCost\": 1,\n      \"creditsDeducted\": true,\n      \"report\": \"## Executive Summary\\n...\",\n      \"pdfUrl\": \"https://res.cloudinary.com/demo/raw/upload/workshop_reports/report_1780000000000.pdf\",\n      \"pdfFileName\": \"Nova_Retail_Strategic_Report.pdf\",\n      \"startedAt\": \"2026-06-02T10:00:00.000Z\",\n      \"completedAt\": \"2026-06-02T10:05:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get One Workshop By Session ID",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/workshop/history/{{sessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workshop",
+                "history",
+                "{{sessionId}}"
+              ]
+            },
+            "description": "Protected endpoint. Returns full saved workshop for this user and sessionId, including classification, axes, scenarios, windTunnelResults, report markdown, and pdfUrl."
+          },
+          "response": [
+            {
+              "name": "Example response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/workshop/history/{{sessionId}}"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"userId\": \"665f00000000000000000001\",\n    \"sessionId\": \"0d4d17a6-9b71-44c6-9b7c-f6fce5a7d111\",\n    \"company\": {\n      \"name\": \"Nova Retail\"\n    },\n    \"forces\": [],\n    \"classification\": {},\n    \"axes\": {},\n    \"scenarios\": {},\n    \"windTunnelResults\": {},\n    \"report\": \"## Executive Summary\\n...\",\n    \"pdfUrl\": \"https://res.cloudinary.com/demo/raw/upload/workshop_reports/report_1780000000000.pdf\",\n    \"pdfFileName\": \"Nova_Retail_Strategic_Report.pdf\",\n    \"pdfGeneratedAt\": \"2026-06-02T10:10:00.000Z\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

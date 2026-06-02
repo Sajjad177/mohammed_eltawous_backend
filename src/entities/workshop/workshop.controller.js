@@ -1,10 +1,38 @@
 import { generatePremiumPDF } from '../../utility/pdfGenerator.js';
 import { callClaudeJSON, callClaudeStream, MODELS } from './ai.service.js';
 import { cloudinaryUploadBuffer } from '../../lib/cloudinaryUpload.js';
+import { checkCreditsAvailable, deductCreditsAfterSuccess } from '../../core/middlewares/creditMiddleware.js';
+import WorkshopAnalysis from './workshopAnalysis.model.js';
+import { v4 as uuidv4 } from 'uuid';
+import subscriptionService from '../subscription/subscription.service.js';
 
+// STEP 1: Classify Forces (COSTS 1 CREDIT)
 export const classifyForces = async (req, res, next) => {
   try {
+    const userId = req.user.id;
     const { company, forces, conversationHistory } = req.body;
+
+    // Check if user has credits
+    const subscription = await subscriptionService.getSubscription(userId);
+    if (subscription.availableCredits < 1) {
+      return res.status(402).json({
+        success: false,
+        message: 'Insufficient credits to start new analysis',
+        availableCredits: subscription.availableCredits,
+        requiredCredits: 1
+      });
+    }
+
+    // Create workshop session
+    const sessionId = uuidv4();
+    const workshopAnalysis = await WorkshopAnalysis.create({
+      userId,
+      sessionId,
+      company,
+      forces,
+      creditsCost: 1,
+      creditsDeducted: false
+    });
 
     const sharedContext =
       "Detailed Company context: " + JSON.stringify(company) + "\n\n" +
@@ -21,9 +49,21 @@ export const classifyForces = async (req, res, next) => {
       "CRITICAL: Do not omit any forces. If a force is provided in the input, it must appear in exactly one of the two categories above.";
 
     const result = await callClaudeJSON(conversationHistory, specificPrompt, 0.1, 4096, MODELS.SONNET, sharedContext);
+
+    // Deduct credit AFTER successful processing
+    await deductCreditsAfterSuccess(workshopAnalysis._id, userId, 1);
+    workshopAnalysis.creditsDeducted = true;
+    workshopAnalysis.classification = result;
+    await workshopAnalysis.save();
+
+    // Get updated subscription
+    const updatedSubscription = await subscriptionService.getSubscription(userId);
+
     res.status(200).json({
       success: true,
       data: result,
+      sessionId: sessionId,
+      creditsRemaining: updatedSubscription.availableCredits,
       history: [
         ...(conversationHistory || []),
         { role: 'user', content: "Classify forces." },
@@ -37,7 +77,17 @@ export const classifyForces = async (req, res, next) => {
 
 export const selectAxes = async (req, res, next) => {
   try {
-    const { company, classification, conversationHistory } = req.body;
+    const userId = req.user.id;
+    const { sessionId, company, classification, conversationHistory } = req.body;
+
+    // Get existing workshop
+    let workshopAnalysis = await WorkshopAnalysis.findOne({ sessionId, userId });
+    if (!workshopAnalysis) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workshop session not found'
+      });
+    }
 
     const sharedContext =
       "Company Context: " + JSON.stringify(company) + "\n\n" +
@@ -69,9 +119,16 @@ export const selectAxes = async (req, res, next) => {
       "}";
 
     const result = await callClaudeJSON(conversationHistory, specificPrompt, 0.1, 1500, MODELS.SONNET, sharedContext);
+
+    // Save to workshop
+    workshopAnalysis.axes = result;
+    workshopAnalysis.lastActivityAt = new Date();
+    await workshopAnalysis.save();
+
     res.status(200).json({
       success: true,
       data: result,
+      sessionId,
       history: [
         ...(conversationHistory || []),
         { role: 'user', content: "Select axes." },
@@ -85,7 +142,17 @@ export const selectAxes = async (req, res, next) => {
 
 export const buildScenarios = async (req, res, next) => {
   try {
-    const { company, axes, forces, conversationHistory } = req.body;
+    const userId = req.user.id;
+    const { sessionId, company, axes, forces, conversationHistory } = req.body;
+
+    // Get existing workshop
+    let workshopAnalysis = await WorkshopAnalysis.findOne({ sessionId, userId });
+    if (!workshopAnalysis) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workshop session not found'
+      });
+    }
 
     const sharedContext =
       "Detailed Company context: " + JSON.stringify(company) + "\n\n" +
@@ -115,16 +182,21 @@ export const buildScenarios = async (req, res, next) => {
       return { ...result, id: q.id, combination: q.comb };
     };
 
-    // To prevent hitting TPM limits and deployment timeouts on huge data, 
-    // we process scenarios in batches (2 + 2)
+    // Process scenarios in batches (2 + 2)
     const batch1 = await Promise.all([generateScenario(quadrants[0]), generateScenario(quadrants[1])]);
     const batch2 = await Promise.all([generateScenario(quadrants[2]), generateScenario(quadrants[3])]);
 
     const finalResult = { scenarios: [...batch1, ...batch2] };
 
+    // Save to workshop
+    workshopAnalysis.scenarios = finalResult;
+    workshopAnalysis.lastActivityAt = new Date();
+    await workshopAnalysis.save();
+
     res.status(200).json({
       success: true,
       data: finalResult,
+      sessionId,
       history: [
         ...(conversationHistory || []),
         { role: 'user', content: "Build 4 scenarios." },
@@ -138,7 +210,17 @@ export const buildScenarios = async (req, res, next) => {
 
 export const runWindTunnel = async (req, res, next) => {
   try {
-    const { company, scenarios, strategicOptions, conversationHistory } = req.body;
+    const userId = req.user.id;
+    const { sessionId, company, scenarios, strategicOptions, conversationHistory } = req.body;
+
+    // Get existing workshop
+    let workshopAnalysis = await WorkshopAnalysis.findOne({ sessionId, userId });
+    if (!workshopAnalysis) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workshop session not found'
+      });
+    }
 
     const hasOptions = strategicOptions && strategicOptions.length > 0;
 
@@ -193,9 +275,16 @@ export const runWindTunnel = async (req, res, next) => {
       "Scenarios: " + JSON.stringify(scenarios.map(s => ({ name: s.name, story: s.story })));
 
     const result = await callClaudeJSON(conversationHistory, specificPrompt, 0.2, 3500, MODELS.SONNET, sharedContext);
+
+    // Save to workshop
+    workshopAnalysis.windTunnelResults = result;
+    workshopAnalysis.lastActivityAt = new Date();
+    await workshopAnalysis.save();
+
     res.status(200).json({
       success: true,
       data: result,
+      sessionId,
       history: [
         ...(conversationHistory || []),
         { role: 'user', content: hasOptions ? "Run wind tunnel." : "Generate and test options." },
@@ -212,8 +301,18 @@ export const runWindTunnel = async (req, res, next) => {
  */
 export const generateReport = async (req, res, next) => {
   try {
-    const { workshopState } = req.body;
+    const userId = req.user.id;
+    const { sessionId, workshopState } = req.body;
     const { company } = workshopState;
+
+    // Get existing workshop
+    let workshopAnalysis = await WorkshopAnalysis.findOne({ sessionId, userId });
+    if (!workshopAnalysis) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workshop session not found'
+      });
+    }
 
     const specificPrompt =
       `You are a premium strategy consultant (McKinsey/Shell style).\n` +
@@ -242,11 +341,17 @@ export const generateReport = async (req, res, next) => {
       }
     }
 
+    // Save report to workshop
+    workshopAnalysis.report = fullText.trim();
+    workshopAnalysis.completedAt = new Date();
+    await workshopAnalysis.save();
+
     // Send the final JSON data for logic (HIDDEN FROM UI)
     const finalData = {
       success: true,
       reportMarkdown: fullText.trim(),
-      generatedAt: new Date().toISOString()
+      generatedAt: new Date().toISOString(),
+      sessionId
     };
     
     // Using a more distinct marker to prevent UI leaks
@@ -268,10 +373,23 @@ export const generateReport = async (req, res, next) => {
  */
 export const downloadPDF = async (req, res, next) => {
   try {
-    const { reportMarkdown, companyName = "Strategic Report" } = req.body;
+    const userId = req.user.id;
+    const { sessionId, reportMarkdown, companyName = "Strategic Report" } = req.body;
+    let workshopAnalysis = null;
 
     if (!reportMarkdown) {
       return res.status(400).json({ success: false, message: "No report content provided." });
+    }
+
+    // Get workshop to verify ownership
+    if (sessionId) {
+      workshopAnalysis = await WorkshopAnalysis.findOne({ sessionId, userId });
+      if (!workshopAnalysis) {
+        return res.status(404).json({
+          success: false,
+          message: 'Workshop session not found'
+        });
+      }
     }
 
     // 1. Generate PDF Buffer locally (fast, no Chrome)
@@ -282,16 +400,68 @@ export const downloadPDF = async (req, res, next) => {
     const folder = "workshop_reports";
 
     const uploadResult = await cloudinaryUploadBuffer(pdfBuffer, publicId, folder);
+    const fileName = `${companyName.replaceAll(' ', '_')}_Strategic_Report.pdf`;
+
+    if (workshopAnalysis) {
+      workshopAnalysis.pdfUrl = uploadResult.secure_url;
+      workshopAnalysis.pdfFileName = fileName;
+      workshopAnalysis.pdfGeneratedAt = new Date();
+      await workshopAnalysis.save();
+    }
 
     // 3. Return the secure URL
     res.status(200).json({
       success: true,
       data: {
         url: uploadResult.secure_url,
-        fileName: `${companyName.replaceAll(' ', '_')}_Strategic_Report.pdf`
+        fileName
       }
     });
 
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getWorkshopHistory = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { limit = 20 } = req.query;
+
+    const history = await WorkshopAnalysis.find({ userId })
+      .sort({ updatedAt: -1 })
+      .limit(parseInt(limit))
+      .select(
+        'sessionId company forces classification axes scenarios windTunnelResults creditsCost creditsDeducted report pdfUrl pdfFileName pdfGeneratedAt startedAt completedAt lastActivityAt createdAt updatedAt'
+      );
+
+    res.status(200).json({
+      success: true,
+      data: history
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getWorkshopBySession = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { sessionId } = req.params;
+
+    const workshopAnalysis = await WorkshopAnalysis.findOne({ sessionId, userId });
+
+    if (!workshopAnalysis) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workshop session not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: workshopAnalysis
+    });
   } catch (error) {
     next(error);
   }

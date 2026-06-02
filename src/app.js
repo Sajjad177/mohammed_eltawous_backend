@@ -17,6 +17,8 @@ import notFound from './core/middlewares/notFound.js';
 import { globalLimiter } from './lib/limit.js';
 import passport from 'passport';
 import expressSession from 'express-session';
+import { startPaymentCronJob, stopPaymentCronJob } from './jobs/paymentVerificationCron.js';
+import { cronCheckInterval } from './core/config/config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -112,7 +114,20 @@ app.use(globalErrorHandler);
 
 logger.info('Middleware stack initialized');
 
-// Initialize payment check cron job (runs every 5 seconds)
-// initPaymentCheckCron();
+// Initialize payment verification cron job
+startPaymentCronJob(cronCheckInterval);
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down...');
+  stopPaymentCronJob();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down...');
+  stopPaymentCronJob();
+  process.exit(0);
+});
 
 export { app };
