@@ -1,7 +1,7 @@
 import passport from 'passport';
 import { Strategy as FacebookStrategy } from 'passport-facebook';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import auth from '../middlewares/authMiddleware';
+import User from '../../entities/auth/auth.model.js';
 
 const facebookOptions = {
   clientID: process.env.FACEBOOK_APP_ID,
@@ -10,7 +10,14 @@ const facebookOptions = {
   profileFields: ['emails', 'name', 'photos']
 };
 
-passport.use(
+console.log('PASSPORT FILE LOADED');
+console.log('📋 Google Strategy Config:', {
+  clientID: process.env.GOOGLE_CLIENT_ID ? '✓ set' : '✗ MISSING',
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET ? '✓ set' : '✗ MISSING',
+  callbackURL: process.env.GOOGLE_CALLBACK_URL || 'not set'
+});
+
+passport.use('google',
   new GoogleStrategy(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
@@ -27,7 +34,7 @@ passport.use(
           });
         }
 
-        const user = await auth.findOne({ email });
+        const user = await User.findOne({ email });
 
         if (user) {
           return done(null, user, {
@@ -35,7 +42,7 @@ passport.use(
           });
         }
 
-        const newUser = await auth.create({
+        const newUser = await User.create({
           email,
           name: profile.displayName,
           imageLink: profile.photos?.[0]?.value,
@@ -55,7 +62,14 @@ passport.use(
   )
 );
 
-passport.use(
+console.log('✅ GOOGLE STRATEGY REGISTERED');
+console.log('📋 Facebook Strategy Config:', {
+  clientID: process.env.FACEBOOK_APP_ID ? '✓ set' : '✗ MISSING',
+  clientSecret: process.env.FACEBOOK_APP_SECRET ? '✓ set' : '✗ MISSING',
+  callbackURL: process.env.FACEBOOK_APP_CALLBACK_URL || 'not set'
+});
+
+passport.use('facebook',
   new FacebookStrategy(
     facebookOptions,
     async (accessToken, refreshToken, profile, done) => {
@@ -68,7 +82,7 @@ passport.use(
           });
         }
 
-        const user = await auth.findOne({ email });
+        const user = await User.findOne({ email });
 
         if (user) {
           return done(null, user, {
@@ -76,7 +90,7 @@ passport.use(
           });
         }
 
-        const newUser = await auth.create({
+        const newUser = await User.create({
           email,
           name: profile.displayName,
           imageLink: profile.photos?.[0]?.value,
@@ -96,16 +110,22 @@ passport.use(
   )
 );
 
+console.log('✅ FACEBOOK STRATEGY REGISTERED');
+console.log('📋 Registered Passport Strategies:', Object.keys(passport._strategies || {}));
+
 passport.serializeUser((user, done) => {
   done(null, user.id);
 });
 
 passport.deserializeUser(async (id, done) => {
   try {
-    const user = await auth.findById(id);
+    const user = await User.findById(id);
     done(null, user);
   } catch (error) {
     console.log('deserializeUser error', error);
     done(error);
   }
 });
+
+
+console.log(passport._strategies);

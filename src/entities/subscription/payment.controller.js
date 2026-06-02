@@ -4,7 +4,7 @@ import { frontendUrl } from '../../core/config/config.js';
 
 export const initializePayment = catchAsync(async (req, res, next) => {
   const { tier } = req.body;
-  const userId = req.user.id;
+  const userId = req.user.userId;
   const frontendBaseUrl = (frontendUrl || 'http://localhost:3000').replace(/\/$/, '');
   const successUrl = `${frontendBaseUrl}/payment-success`;
   const cancelUrl = `${frontendBaseUrl}/payment-cancel`;
@@ -33,7 +33,7 @@ export const initializePayment = catchAsync(async (req, res, next) => {
 
 export const getPaymentStatus = catchAsync(async (req, res, next) => {
   const { paymentId } = req.params;
-  const userId = req.user.id;
+  const userId = req.user.userId;
 
   const status = await paymentService.getPaymentStatus(paymentId, userId);
 

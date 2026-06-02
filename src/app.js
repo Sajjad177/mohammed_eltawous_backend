@@ -19,6 +19,7 @@ import passport from 'passport';
 import expressSession from 'express-session';
 import { startPaymentCronJob, stopPaymentCronJob } from './jobs/paymentVerificationCron.js';
 import { cronCheckInterval } from './core/config/config.js';
+import './core/config/passport.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,7 +28,7 @@ const app = express();
 
 app.use(
   expressSession({
-    secret: 'keyboard cat',
+    secret: process.env.EXPRESS_SESSION_SECRET,
     resave: false,
     saveUninitialized: false
   })
