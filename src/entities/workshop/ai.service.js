@@ -4,8 +4,15 @@ import logger from '../../core/config/logger.js';
 import dotenv from 'dotenv';
 dotenv.config();
 
+const normalizeApiKey = (key = '') =>
+  key.trim().replace(/^Bearer\s+/i, '').replace(/^['"]|['"]$/g, '');
+
+const anthropicApiKey = normalizeApiKey(
+  process.env.CLAUDE_KEY || process.env.ANTHROPIC_API_KEY || ''
+);
+
 const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+  apiKey: anthropicApiKey,
   timeout: 120000, // 2 minutes
   defaultHeaders: {
     "anthropic-version": "2023-06-01"
@@ -20,19 +27,65 @@ export const MODELS = {
   HAIKU: HAIKU_MODEL
 };
 
-/**
- * Robustly extracts JSON from a potentially messy string.
- * Finds the first '{' and the last '}' to isolate a JSON object.
- */
-const extractJSON = (text) => {
-  const firstBrace = text.indexOf('{');
-  const lastBrace = text.lastIndexOf('}');
+export class AIJsonError extends Error {
+  constructor(message, details = {}) {
+    super(message);
+    this.name = 'AIJsonError';
+    this.statusCode = 502;
+    this.details = details;
+  }
+}
 
-  if (firstBrace === -1 || lastBrace === -1 || lastBrace < firstBrace) {
-    throw new Error('No valid JSON object found in response.');
+const isObject = (value) =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+/**
+ * Extracts the first balanced JSON object from messy model text.
+ * This avoids the common first-brace/last-brace bug when prose contains
+ * multiple objects, examples, or trailing text.
+ */
+const extractJSON = (text = '') => {
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (char === '{') {
+      if (depth === 0) start = i;
+      depth += 1;
+      continue;
+    }
+
+    if (char === '}') {
+      depth -= 1;
+      if (depth === 0 && start !== -1) {
+        return text.substring(start, i + 1);
+      }
+    }
   }
 
-  return text.substring(firstBrace, lastBrace + 1);
+  throw new AIJsonError('No complete JSON object found in AI response.', {
+    rawText: text.slice(0, 2000)
+  });
 };
 
 const jsonTool = {
@@ -42,6 +95,52 @@ const jsonTool = {
     type: "object",
     additionalProperties: true
   }
+};
+
+const buildJsonTool = (schema) => ({
+  ...jsonTool,
+  input_schema: schema || jsonTool.input_schema
+});
+
+const parseAnthropicErrorPayload = (error) => {
+  const statusCode = error?.status || error?.statusCode;
+  const message = error?.message || '';
+  const jsonStart = message.indexOf('{');
+
+  if (jsonStart === -1) {
+    return { statusCode, type: error?.type, message };
+  }
+
+  try {
+    const payload = JSON.parse(message.slice(jsonStart));
+    return {
+      statusCode,
+      type: payload?.error?.type || error?.type,
+      message: payload?.error?.message || message,
+      requestId: payload?.request_id
+    };
+  } catch {
+    return { statusCode, type: error?.type, message };
+  }
+};
+
+const mapAnthropicError = (error) => {
+  const payload = parseAnthropicErrorPayload(error);
+  const message = payload.message || error?.message || '';
+  const isAuthError =
+    payload.statusCode === 401 ||
+    payload.type === 'authentication_error' ||
+    message.includes('invalid x-api-key');
+
+  if (!isAuthError) return null;
+
+  return new AIJsonError('Anthropic API key is invalid. Update ANTHROPIC_API_KEY in the backend .env file.', {
+    provider: 'anthropic',
+    providerStatusCode: payload.statusCode || 401,
+    providerErrorType: payload.type || 'authentication_error',
+    providerMessage: message,
+    requestId: payload.requestId
+  });
 };
 
 const getToolInput = (response) => {
@@ -55,6 +154,49 @@ const getTextResponse = (response) => {
     .map((block) => block.text)
     .join('\n')
     .trim() || '';
+};
+
+const parseClaudeJSONResponse = (response) => {
+  const toolInput = getToolInput(response);
+  if (toolInput) {
+    if (!isObject(toolInput)) {
+      throw new AIJsonError('AI returned JSON, but it was not an object.', {
+        stopReason: response.stop_reason
+      });
+    }
+    return toolInput;
+  }
+
+  const rawText = getTextResponse(response);
+  const jsonString = extractJSON(rawText);
+  const parsed = JSON.parse(jsonString);
+
+  if (!isObject(parsed)) {
+    throw new AIJsonError('AI returned JSON, but it was not an object.', {
+      stopReason: response.stop_reason,
+      rawText
+    });
+  }
+
+  return parsed;
+};
+
+const assertValidResult = (result, validator, label) => {
+  if (!validator) return;
+
+  const validationResult = validator(result);
+  if (validationResult === true || validationResult === undefined) return;
+
+  throw new AIJsonError(
+    `AI returned JSON that does not match the expected ${label || 'response'} shape.`,
+    {
+      validationError:
+        typeof validationResult === 'string'
+          ? validationResult
+          : 'Unexpected response structure',
+      resultPreview: JSON.stringify(result).slice(0, 2000)
+    }
+  );
 };
 
 /**
@@ -85,12 +227,19 @@ export const callClaudeStream = async (messages, specificPrompt, temperature = 0
   });
 };
 
-export const callClaudeJSON = async (messages, specificPrompt, temperature = 0.5, maxTokens = 4096, modelSelection = MODELS.SONNET, sharedContext = '') => {
-  let rawText = '';
-  try {
-    const defaultMessages = messages && messages.length > 0 ? messages : [];
+export const callClaudeJSON = async (
+  messages,
+  specificPrompt,
+  temperature = 0.5,
+  maxTokens = 4096,
+  modelSelection = MODELS.SONNET,
+  sharedContext = '',
+  options = {}
+) => {
+  const { schema, validator, label = 'JSON' } = options;
+  let lastError = null;
 
-    // Construct system blocks for optimal caching
+  const createResponse = async (attemptMessages, attemptTemperature, attemptPrompt) => {
     const systemBlocks = [
       {
         type: "text",
@@ -112,62 +261,86 @@ export const callClaudeJSON = async (messages, specificPrompt, temperature = 0.5
       text: "\n\nINSTRUCTIONS:\n" + specificPrompt
     });
 
-    const response = await anthropic.messages.create({
+    return anthropic.messages.create({
       model: modelSelection,
-      max_tokens: maxTokens,
-      temperature,
+      max_tokens: Math.max(maxTokens, 4096),
+      temperature: attemptTemperature,
       system: systemBlocks,
-      tools: [jsonTool],
+      tools: [buildJsonTool(schema)],
       tool_choice: { type: "tool", name: jsonTool.name },
       messages: [
-        ...defaultMessages,
-        { role: 'user', content: "Please perform the following task now:\n\n" + specificPrompt + "\n\nCRITICAL: Return your final answer by calling the return_json tool." }
+        ...attemptMessages,
+        {
+          role: 'user',
+          content:
+            attemptPrompt +
+            "\n\nCRITICAL: Return only by calling the return_json tool. Do not return markdown or plain text."
+        }
       ],
     }, {
       headers: {
         "anthropic-beta": "prompt-caching-2024-07-31"
       }
     });
+  };
 
-    const toolInput = getToolInput(response);
-    if (toolInput) {
-      return toolInput;
-    }
+  try {
+    const defaultMessages = messages && messages.length > 0 ? messages : [];
+    const response = await createResponse(
+      defaultMessages,
+      temperature,
+      "Please perform the following task now:\n\n" + specificPrompt
+    );
 
-    rawText = getTextResponse(response);
-    const jsonString = extractJSON(rawText);
-    return JSON.parse(jsonString);
+    const result = parseClaudeJSONResponse(response);
+    assertValidResult(result, validator, label);
+    return result;
 
   } catch (error) {
-    logger.error("Claude JSON Parse Error. Raw Text:", { rawText, error: error.message });
+    const providerError = mapAnthropicError(error);
+    if (providerError) {
+      logger.error("Claude Authentication Error:", providerError.details);
+      throw providerError;
+    }
 
-    // basic retry
+    lastError = error;
+    logger.error("Claude JSON Error:", {
+      error: error.message,
+      details: error.details
+    });
+
+    // Retry with clean context. Previous assistant JSON can cause the model to
+    // repeat an earlier step's object even when a tool is forced.
     try {
-      const responseRetry = await anthropic.messages.create({
-        model: modelSelection,
-        max_tokens: maxTokens,
-        temperature: temperature,
-        system: systemPrompt,
-        tools: [jsonTool],
-        tool_choice: { type: "tool", name: jsonTool.name },
-        messages: [
-          ...(messages || []),
-          { role: 'user', content: specificPrompt + "\n\nCRITICAL: Return your final answer by calling the return_json tool only." }
-        ],
-      });
+      const responseRetry = await createResponse(
+        [],
+        Math.min(temperature, 0.2),
+        "Generate the requested response again from the shared context and instructions.\n\n" +
+          specificPrompt
+      );
 
-      const toolInput = getToolInput(responseRetry);
-      if (toolInput) {
-        return toolInput;
-      }
-
-      rawText = getTextResponse(responseRetry);
-      const jsonString = extractJSON(rawText);
-      return JSON.parse(jsonString);
+      const result = parseClaudeJSONResponse(responseRetry);
+      assertValidResult(result, validator, label);
+      return result;
 
     } catch (retryError) {
-      logger.error("Claude Retry Error. Raw Text:", { rawText, error: retryError.message });
-      throw new Error("Failed to parse AI response into JSON after retry.");
+      const retryProviderError = mapAnthropicError(retryError);
+      if (retryProviderError) {
+        logger.error("Claude Authentication Error:", retryProviderError.details);
+        throw retryProviderError;
+      }
+
+      logger.error("Claude Retry Error:", {
+        firstError: lastError?.message,
+        retryError: retryError.message,
+        details: retryError.details
+      });
+
+      throw new AIJsonError("Failed to parse AI response into JSON after retry.", {
+        firstError: lastError?.message,
+        retryError: retryError.message,
+        retryDetails: retryError.details
+      });
     }
   }
 };

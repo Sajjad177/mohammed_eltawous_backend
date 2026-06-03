@@ -6,6 +6,216 @@ import WorkshopAnalysis from './workshopAnalysis.model.js';
 import { v4 as uuidv4 } from 'uuid';
 import subscriptionService from '../subscription/subscription.service.js';
 
+const isObject = (value) =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const hasString = (value, key) =>
+  typeof value?.[key] === 'string' && value[key].trim().length > 0;
+
+const classificationSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['predetermined', 'uncertainties'],
+  properties: {
+    predetermined: {
+      type: 'array',
+      items: {
+        anyOf: [
+          { type: 'string' },
+          { type: 'object', additionalProperties: true }
+        ]
+      }
+    },
+    uncertainties: {
+      type: 'array',
+      items: {
+        anyOf: [
+          { type: 'string' },
+          { type: 'object', additionalProperties: true }
+        ]
+      }
+    }
+  }
+};
+
+const axesSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['axisA', 'axisB', 'scenarios'],
+  properties: {
+    axisA: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['label', 'selectedForce', 'poleA1', 'poleA2', 'reason'],
+      properties: {
+        label: { type: 'string' },
+        selectedForce: { type: 'string' },
+        poleA1: { type: 'string' },
+        poleA2: { type: 'string' },
+        reason: { type: 'string' }
+      }
+    },
+    axisB: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['label', 'selectedForce', 'poleB1', 'poleB2', 'reason'],
+      properties: {
+        label: { type: 'string' },
+        selectedForce: { type: 'string' },
+        poleB1: { type: 'string' },
+        poleB2: { type: 'string' },
+        reason: { type: 'string' }
+      }
+    },
+    scenarios: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['topRight', 'topLeft', 'bottomLeft', 'bottomRight'],
+      properties: {
+        topRight: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['name', 'summary'],
+          properties: { name: { type: 'string' }, summary: { type: 'string' } }
+        },
+        topLeft: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['name', 'summary'],
+          properties: { name: { type: 'string' }, summary: { type: 'string' } }
+        },
+        bottomLeft: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['name', 'summary'],
+          properties: { name: { type: 'string' }, summary: { type: 'string' } }
+        },
+        bottomRight: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['name', 'summary'],
+          properties: { name: { type: 'string' }, summary: { type: 'string' } }
+        }
+      }
+    }
+  }
+};
+
+const scenarioSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['name', 'story', 'implications', 'signposts'],
+  properties: {
+    name: { type: 'string' },
+    story: { type: 'string' },
+    implications: { type: 'string' },
+    signposts: {
+      type: 'array',
+      items: { type: 'string' }
+    }
+  }
+};
+
+const windTunnelCellSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['rating', 'reasoning'],
+  properties: {
+    rating: { type: 'string' },
+    reasoning: { type: 'string' }
+  }
+};
+
+const windTunnelSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['windTunnel', 'robustMoves', 'strategicConclusion', 'recommendedOption'],
+  properties: {
+    generatedOptions: {
+      type: 'array',
+      items: { type: 'string' }
+    },
+    windTunnel: {
+      type: 'array',
+      items: {
+        type: 'array',
+        items: windTunnelCellSchema
+      }
+    },
+    robustMoves: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['noRegret', 'keepOpen', 'defer'],
+      properties: {
+        noRegret: { type: 'array', items: { type: 'string' } },
+        keepOpen: { type: 'array', items: { type: 'string' } },
+        defer: { type: 'array', items: { type: 'string' } }
+      }
+    },
+    strategicConclusion: { type: 'string' },
+    recommendedOption: { type: 'string' }
+  }
+};
+
+const validateClassification = (result) => {
+  if (!isObject(result)) return 'Response must be an object.';
+  if (!Array.isArray(result.predetermined)) return 'Missing predetermined array.';
+  if (!Array.isArray(result.uncertainties)) return 'Missing uncertainties array.';
+  return true;
+};
+
+const validateAxes = (result) => {
+  if (!isObject(result)) return 'Response must be an object.';
+
+  const hasAxisA =
+    isObject(result.axisA) &&
+    hasString(result.axisA, 'label') &&
+    hasString(result.axisA, 'selectedForce') &&
+    hasString(result.axisA, 'poleA1') &&
+    hasString(result.axisA, 'poleA2');
+
+  const hasAxisB =
+    isObject(result.axisB) &&
+    hasString(result.axisB, 'label') &&
+    hasString(result.axisB, 'selectedForce') &&
+    hasString(result.axisB, 'poleB1') &&
+    hasString(result.axisB, 'poleB2');
+
+  if (!hasAxisA) return 'Missing complete axisA object.';
+  if (!hasAxisB) return 'Missing complete axisB object.';
+
+  const scenarioKeys = ['topRight', 'topLeft', 'bottomLeft', 'bottomRight'];
+  if (!isObject(result.scenarios)) return 'Missing scenarios object.';
+  for (const key of scenarioKeys) {
+    if (!isObject(result.scenarios[key])) return `Missing ${key} scenario.`;
+    if (!hasString(result.scenarios[key], 'name')) return `Missing ${key}.name.`;
+    if (!hasString(result.scenarios[key], 'summary')) return `Missing ${key}.summary.`;
+  }
+
+  return true;
+};
+
+const validateScenario = (result) => {
+  if (!isObject(result)) return 'Response must be an object.';
+  if (!hasString(result, 'name')) return 'Missing scenario name.';
+  if (!hasString(result, 'story')) return 'Missing scenario story.';
+  if (!hasString(result, 'implications')) return 'Missing scenario implications.';
+  if (!Array.isArray(result.signposts)) return 'Missing signposts array.';
+  return true;
+};
+
+const validateWindTunnel = (result) => {
+  if (!isObject(result)) return 'Response must be an object.';
+  if (!Array.isArray(result.windTunnel)) return 'Missing windTunnel array.';
+  if (!isObject(result.robustMoves)) return 'Missing robustMoves object.';
+  if (!Array.isArray(result.robustMoves.noRegret)) return 'Missing robustMoves.noRegret array.';
+  if (!Array.isArray(result.robustMoves.keepOpen)) return 'Missing robustMoves.keepOpen array.';
+  if (!Array.isArray(result.robustMoves.defer)) return 'Missing robustMoves.defer array.';
+  if (!hasString(result, 'strategicConclusion')) return 'Missing strategicConclusion.';
+  if (!hasString(result, 'recommendedOption')) return 'Missing recommendedOption.';
+  return true;
+};
+
 // STEP 1: Classify Forces (COSTS 1 CREDIT)
 export const classifyForces = async (req, res, next) => {
   try {
@@ -82,7 +292,11 @@ export const classifyForces = async (req, res, next) => {
 
     let result;
     try {
-      result = await callClaudeJSON(conversationHistory, specificPrompt, 0.1, 4096, MODELS.SONNET, sharedContext);
+      result = await callClaudeJSON(conversationHistory, specificPrompt, 0.1, 4096, MODELS.SONNET, sharedContext, {
+        schema: classificationSchema,
+        validator: validateClassification,
+        label: 'classification'
+      });
     } catch (error) {
       workshopAnalysis.status = 'failed';
       workshopAnalysis.lastError = error.message;
@@ -92,8 +306,9 @@ export const classifyForces = async (req, res, next) => {
 
       return res.status(502).json({
         success: false,
-        message: 'AI returned a response that could not be parsed. Retry with the same sessionId to update this saved attempt.',
+        message: error.message,
         error: error.message,
+        details: error.details,
         sessionId
       });
     }
@@ -173,7 +388,11 @@ export const selectAxes = async (req, res, next) => {
       "  }\n" +
       "}";
 
-    const result = await callClaudeJSON(conversationHistory, specificPrompt, 0.1, 1500, MODELS.SONNET, sharedContext);
+    const result = await callClaudeJSON(conversationHistory, specificPrompt, 0.1, 3000, MODELS.SONNET, sharedContext, {
+      schema: axesSchema,
+      validator: validateAxes,
+      label: 'axes'
+    });
 
     // Save to workshop
     workshopAnalysis.axes = result;
@@ -233,7 +452,11 @@ export const buildScenarios = async (req, res, next) => {
         `- List 3-4 key early warning signposts.\n\n` +
         `Return JSON exactly matching this format: { "name": "string", "story": "string", "implications": "string", "signposts": ["string"] }`;
 
-      const result = await callClaudeJSON(conversationHistory, specificPrompt, 0.7, 2500, MODELS.SONNET, sharedContext);
+      const result = await callClaudeJSON(conversationHistory, specificPrompt, 0.7, 3500, MODELS.SONNET, sharedContext, {
+        schema: scenarioSchema,
+        validator: validateScenario,
+        label: `scenario ${q.comb}`
+      });
       return { ...result, id: q.id, combination: q.comb };
     };
 
@@ -329,7 +552,11 @@ export const runWindTunnel = async (req, res, next) => {
       "Company: " + JSON.stringify(company) + "\n\n" +
       "Scenarios: " + JSON.stringify(scenarios.map(s => ({ name: s.name, story: s.story })));
 
-    const result = await callClaudeJSON(conversationHistory, specificPrompt, 0.2, 3500, MODELS.SONNET, sharedContext);
+    const result = await callClaudeJSON(conversationHistory, specificPrompt, 0.2, 5000, MODELS.SONNET, sharedContext, {
+      schema: windTunnelSchema,
+      validator: validateWindTunnel,
+      label: 'wind tunnel'
+    });
 
     // Save to workshop
     workshopAnalysis.windTunnelResults = result;
