@@ -9,7 +9,7 @@ import subscriptionService from '../subscription/subscription.service.js';
 // STEP 1: Classify Forces (COSTS 1 CREDIT)
 export const classifyForces = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { company, forces, conversationHistory } = req.body;
 
     // Check if user has credits
@@ -77,7 +77,7 @@ export const classifyForces = async (req, res, next) => {
 
 export const selectAxes = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { sessionId, company, classification, conversationHistory } = req.body;
 
     // Get existing workshop
@@ -142,7 +142,7 @@ export const selectAxes = async (req, res, next) => {
 
 export const buildScenarios = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { sessionId, company, axes, forces, conversationHistory } = req.body;
 
     // Get existing workshop
@@ -210,7 +210,7 @@ export const buildScenarios = async (req, res, next) => {
 
 export const runWindTunnel = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { sessionId, company, scenarios, strategicOptions, conversationHistory } = req.body;
 
     // Get existing workshop
@@ -301,7 +301,7 @@ export const runWindTunnel = async (req, res, next) => {
  */
 export const generateReport = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { sessionId, workshopState } = req.body;
     const { company } = workshopState;
 
@@ -373,7 +373,7 @@ export const generateReport = async (req, res, next) => {
  */
 export const downloadPDF = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { sessionId, reportMarkdown, companyName = "Strategic Report" } = req.body;
     let workshopAnalysis = null;
 
@@ -425,7 +425,7 @@ export const downloadPDF = async (req, res, next) => {
 
 export const getWorkshopHistory = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { limit = 20 } = req.query;
 
     const history = await WorkshopAnalysis.find({ userId })
@@ -446,7 +446,7 @@ export const getWorkshopHistory = async (req, res, next) => {
 
 export const getWorkshopBySession = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { sessionId } = req.params;
 
     const workshopAnalysis = await WorkshopAnalysis.findOne({ sessionId, userId });
