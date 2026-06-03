@@ -35,6 +35,28 @@ const extractJSON = (text) => {
   return text.substring(firstBrace, lastBrace + 1);
 };
 
+const jsonTool = {
+  name: "return_json",
+  description: "Return the final answer as a JSON object that exactly follows the user's requested structure.",
+  input_schema: {
+    type: "object",
+    additionalProperties: true
+  }
+};
+
+const getToolInput = (response) => {
+  const toolUse = response.content?.find((block) => block.type === 'tool_use' && block.name === jsonTool.name);
+  return toolUse?.input || null;
+};
+
+const getTextResponse = (response) => {
+  return response.content
+    ?.filter((block) => block.type === 'text' && block.text)
+    .map((block) => block.text)
+    .join('\n')
+    .trim() || '';
+};
+
 /**
  * Streams text from Claude for real-time delivery.
  */
@@ -95,9 +117,11 @@ export const callClaudeJSON = async (messages, specificPrompt, temperature = 0.5
       max_tokens: maxTokens,
       temperature,
       system: systemBlocks,
+      tools: [jsonTool],
+      tool_choice: { type: "tool", name: jsonTool.name },
       messages: [
         ...defaultMessages,
-        { role: 'user', content: "Please perform the following task now:\n\n" + specificPrompt + "\n\nCRITICAL: Return ONLY valid JSON." }
+        { role: 'user', content: "Please perform the following task now:\n\n" + specificPrompt + "\n\nCRITICAL: Return your final answer by calling the return_json tool." }
       ],
     }, {
       headers: {
@@ -105,7 +129,12 @@ export const callClaudeJSON = async (messages, specificPrompt, temperature = 0.5
       }
     });
 
-    rawText = response.content[0].text.trim();
+    const toolInput = getToolInput(response);
+    if (toolInput) {
+      return toolInput;
+    }
+
+    rawText = getTextResponse(response);
     const jsonString = extractJSON(rawText);
     return JSON.parse(jsonString);
 
@@ -119,13 +148,20 @@ export const callClaudeJSON = async (messages, specificPrompt, temperature = 0.5
         max_tokens: maxTokens,
         temperature: temperature,
         system: systemPrompt,
+        tools: [jsonTool],
+        tool_choice: { type: "tool", name: jsonTool.name },
         messages: [
           ...(messages || []),
-          { role: 'user', content: specificPrompt + "\n\nCRITICAL: YOU FAILED TO RETURN VALID JSON. RETURN ONLY STRICT VALID JSON NOW WITHOUT FENCES OR PREAMBLE." }
+          { role: 'user', content: specificPrompt + "\n\nCRITICAL: Return your final answer by calling the return_json tool only." }
         ],
       });
 
-      rawText = responseRetry.content[0].text.trim();
+      const toolInput = getToolInput(responseRetry);
+      if (toolInput) {
+        return toolInput;
+      }
+
+      rawText = getTextResponse(responseRetry);
       const jsonString = extractJSON(rawText);
       return JSON.parse(jsonString);
 
