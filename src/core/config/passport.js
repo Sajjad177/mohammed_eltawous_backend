@@ -10,14 +10,8 @@ const facebookOptions = {
   profileFields: ['emails', 'name', 'photos']
 };
 
-console.log('PASSPORT FILE LOADED');
-console.log('📋 Google Strategy Config:', {
-  clientID: process.env.GOOGLE_CLIENT_ID ? '✓ set' : '✗ MISSING',
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET ? '✓ set' : '✗ MISSING',
-  callbackURL: process.env.GOOGLE_CALLBACK_URL || 'not set'
-});
-
-passport.use('google',
+passport.use(
+  'google',
   new GoogleStrategy(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
@@ -55,21 +49,14 @@ passport.use('google',
           message: 'User account created successfully.'
         });
       } catch (error) {
-        console.log('google strategy error', error);
         return done(error);
       }
     }
   )
 );
 
-console.log('✅ GOOGLE STRATEGY REGISTERED');
-console.log('📋 Facebook Strategy Config:', {
-  clientID: process.env.FACEBOOK_APP_ID ? '✓ set' : '✗ MISSING',
-  clientSecret: process.env.FACEBOOK_APP_SECRET ? '✓ set' : '✗ MISSING',
-  callbackURL: process.env.FACEBOOK_APP_CALLBACK_URL || 'not set'
-});
-
-passport.use('facebook',
+passport.use(
+  'facebook',
   new FacebookStrategy(
     facebookOptions,
     async (accessToken, refreshToken, profile, done) => {
@@ -103,15 +90,11 @@ passport.use('facebook',
           message: 'User account created successfully.'
         });
       } catch (error) {
-        console.log('facebook strategy error', error);
         return done(error);
       }
     }
   )
 );
-
-console.log('✅ FACEBOOK STRATEGY REGISTERED');
-console.log('📋 Registered Passport Strategies:', Object.keys(passport._strategies || {}));
 
 passport.serializeUser((user, done) => {
   done(null, user.id);
@@ -122,10 +105,8 @@ passport.deserializeUser(async (id, done) => {
     const user = await User.findById(id);
     done(null, user);
   } catch (error) {
-    console.log('deserializeUser error', error);
     done(error);
   }
 });
-
 
 console.log(passport._strategies);

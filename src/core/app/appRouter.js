@@ -3,6 +3,7 @@ import { Router } from 'express';
 import workshopRoutes from '../../entities/workshop/workshop.routes.js';
 import authRoutes from '../../entities/auth/auth.routes.js';
 import subscriptionRoutes from '../../entities/subscription/subscription.routes.js';
+import mailSendRoutes from '../../entities/mailSend/mailSend.router.js';
 
 const router = Router();
 
@@ -18,6 +19,10 @@ const moduleRouter = [
   {
     path: '/subscription',
     router: subscriptionRoutes
+  },
+  {
+    path: '/send-mail',
+    router: mailSendRoutes
   }
 ];
 

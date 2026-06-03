@@ -103,7 +103,7 @@ export const login = async (payload) => {
   const tokenPayload = {
     userId: user._id,
     email: user.email,
-    userType: user.userType
+    role: user.role
   };
 
   const accessToken = createToken(tokenPayload, jwtSecret, jwtExpire);

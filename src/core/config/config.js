@@ -23,7 +23,7 @@ export const emailPort = process.env.EMAIL_PORT;
 export const emailAddress = process.env.EMAIL_ADDRESS;
 export const emailPass = process.env.EMAIL_PASS;
 export const emailFrom = process.env.EMAIL_FROM;
-export const adminMail = process.env.ADMIN_EMAIL;
+export const adminMail = process.env.EMAIL_ADDRESS;
 export const emailTo = process.env.EMAIL_TO;
 
 // Cloudinary config
@@ -45,6 +45,7 @@ export const stripeSecret = process.env.STRIPE_SECRET_KEY;
 export const stripePublishable = process.env.STRIPE_PUBLISHABLE_KEY;
 
 // Cron & Payment
-export const cronCheckInterval = parseInt(process.env.CRON_CHECK_INTERVAL || 10000); // milliseconds (default 10 seconds)
+export const cronCheckInterval = parseInt(
+  process.env.CRON_CHECK_INTERVAL || 10000
+); // milliseconds (default 10 seconds)
 export const paymentMaxAge = process.env.PAYMENT_MAX_AGE || 1440; // 24 hours in minutes
-
