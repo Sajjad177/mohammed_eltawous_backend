@@ -2,7 +2,7 @@ import mongoose, { Schema } from 'mongoose';
 
 const sendMailModel = new Schema(
   {
-    userId: { type: String, required: true },
+    userId: { type: String, ref: 'User' },
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
     type: {

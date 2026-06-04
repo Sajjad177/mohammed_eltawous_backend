@@ -86,3 +86,11 @@ export const mailSendService = async (payload, email) => {
 
   return savedMail;
 };
+
+export const getAllMailSendService = async () => {
+  const mailSends = await SendMail.find()
+    .populate('userId', 'name phone email imageLink')
+    .sort({ createdAt: -1 });
+
+  return mailSends;
+};
