@@ -40,6 +40,10 @@ export const sendInviteLink = async (payload, email) => {
   }
 
   if (!payload.workshopAnalysisId) {
+    throw new Error('Please create a scenario before inviting guests.');
+  }
+
+  if (!payload.workshopAnalysisId) {
     throw new Error('Workshop Analysis Id is required.');
   }
 
