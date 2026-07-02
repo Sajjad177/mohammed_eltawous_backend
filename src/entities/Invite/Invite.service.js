@@ -79,6 +79,7 @@ export const sendInviteLink = async (payload, email) => {
 
   return {
     inviteId: invite._id,
+    token: invite.token,
     inviteLink
   };
 };

@@ -6,7 +6,11 @@ const router = express.Router();
 const authenticate = auth();
 
 router.get('/history', authenticate, workshopController.getWorkshopHistory);
-router.get('/history/:sessionId', authenticate, workshopController.getWorkshopBySession);
+router.get(
+  '/history/:sessionId',
+  authenticate,
+  workshopController.getWorkshopBySession
+);
 
 router.post('/classify', authenticate, workshopController.classifyForces);
 router.post('/axes', authenticate, workshopController.selectAxes);
@@ -14,5 +18,6 @@ router.post('/scenarios', authenticate, workshopController.buildScenarios);
 router.post('/windtunnel', authenticate, workshopController.runWindTunnel);
 router.post('/report', authenticate, workshopController.generateReport);
 router.post('/report/download', authenticate, workshopController.downloadPDF);
+router.post('/guest/:token', workshopController.addedByInvitedUser);
 
 export default router;

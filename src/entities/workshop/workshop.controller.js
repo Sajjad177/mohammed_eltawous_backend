@@ -8,6 +8,7 @@ import {
 import WorkshopAnalysis from './workshopAnalysis.model.js';
 import { v4 as uuidv4 } from 'uuid';
 import subscriptionService from '../subscription/subscription.service.js';
+import Invite from '../Invite/Invite.model.js';
 
 const isObject = (value) =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -870,6 +871,49 @@ export const getWorkshopBySession = async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: workshopAnalysis
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const addedByInvitedUser = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+    console.log(token);
+    const { factor } = req.body;
+    console.log(factor);
+
+    if (!factor) {
+      throw new Error('Factor is required.');
+    }
+
+    // Find invite
+    const invite = await Invite.findOne({ token });
+
+    if (!invite) {
+      throw new Error('Invalid invitation link.');
+    }
+
+    // Find workshop
+    const workshop = await WorkshopAnalysis.findById(invite.workshopAnalysisId);
+
+    if (!workshop) {
+      throw new Error('Workshop analysis not found.');
+    }
+
+    // Push object matching schema
+    workshop.guestAdd.push({
+      inviteId: invite._id,
+      forces: [factor]
+    });
+
+    await workshop.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Moving factor added successfully.',
+      data: workshop.guestAdd
     });
   } catch (error) {
     next(error);

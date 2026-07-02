@@ -45,6 +45,19 @@ const workshopAnalysisSchema = new mongoose.Schema(
     // Data storage from each step
     company: mongoose.Schema.Types.Mixed,
     forces: [mongoose.Schema.Types.Mixed],
+    guestAdd: [
+      {
+        inviteId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Invite'
+        },
+        forces: [String],
+        addedAt: {
+          type: Date,
+          default: Date.now
+        }
+      }
+    ],
     classification: mongoose.Schema.Types.Mixed,
     axes: mongoose.Schema.Types.Mixed,
     scenarios: mongoose.Schema.Types.Mixed,
@@ -82,7 +95,8 @@ const workshopAnalysisSchema = new mongoose.Schema(
   { timestamps: true, versionKey: false }
 );
 
-const WorkshopAnalysis = mongoose.models.WorkshopAnalysis || 
+const WorkshopAnalysis =
+  mongoose.models.WorkshopAnalysis ||
   mongoose.model('WorkshopAnalysis', workshopAnalysisSchema);
 
 export default WorkshopAnalysis;
