@@ -1,10 +1,7 @@
 import { generatePremiumPDF } from '../../utility/pdfGenerator.js';
 import { callClaudeJSON, callClaudeStream, MODELS } from './ai.service.js';
 import { cloudinaryUploadBuffer } from '../../lib/cloudinaryUpload.js';
-import {
-  checkCreditsAvailable,
-  deductCreditsAfterSuccess
-} from '../../core/middlewares/creditMiddleware.js';
+import { deductCreditsAfterSuccess } from '../../core/middlewares/creditMiddleware.js';
 import WorkshopAnalysis from './workshopAnalysis.model.js';
 import { v4 as uuidv4 } from 'uuid';
 import subscriptionService from '../subscription/subscription.service.js';
@@ -988,9 +985,9 @@ export const deleteInvitedUserFactor = async (req, res, next) => {
     );
 
     if (guestEntryIndex > -1) {
-      workshop.guestAdd[guestEntryIndex].forces = workshop.guestAdd[guestEntryIndex].forces.filter(
-        (f) => f !== factor
-      );
+      workshop.guestAdd[guestEntryIndex].forces = workshop.guestAdd[
+        guestEntryIndex
+      ].forces.filter((f) => f !== factor);
       await workshop.save();
     } else {
       throw new Error('Guest entry not found.');
@@ -1000,6 +997,32 @@ export const deleteInvitedUserFactor = async (req, res, next) => {
       success: true,
       message: 'Factor deleted successfully.',
       data: workshop.guestAdd
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAllWorkshopBySession = async (req, res, next) => {
+  try {
+    // const userId = req.user.userId;
+    const { sessionId } = req.params;
+
+    const workshopAnalysis = await WorkshopAnalysis.findOne({
+      sessionId
+    });
+
+    if (!workshopAnalysis) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workshop session not found'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Workshop session found successfully.',
+      data: workshopAnalysis
     });
   } catch (error) {
     next(error);

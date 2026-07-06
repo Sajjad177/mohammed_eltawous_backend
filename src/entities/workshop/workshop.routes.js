@@ -21,5 +21,10 @@ router.post('/report', authenticate, workshopController.generateReport);
 router.post('/report/download', authenticate, workshopController.downloadPDF);
 router.post('/guest/:token', workshopController.addedByInvitedUser);
 router.delete('/guest/:token', workshopController.deleteInvitedUserFactor);
+router.get(
+  '/all/:sessionId',
+  // authenticate,
+  workshopController.getAllWorkshopBySession
+);
 
 export default router;
